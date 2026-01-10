@@ -1,4 +1,4 @@
-using System;
+ï»¿using System;
 using System.Management;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -16,9 +16,14 @@ namespace Auto_Screen_Brightness
         // Overlay UI
         private ToggleSwitch _overlayToggle;
         private Slider _overlaySlider;
+        private ToggleSwitch _minimizeToTrayToggle;
+        private ToggleSwitch _startupToggle;
 
         public MainWindow()
         {
+            // Load settings first
+            SettingsManager.Load();
+
             // Build UI in code to avoid XAML generated code dependencies
             var stack = new StackPanel
             {
@@ -85,6 +90,55 @@ namespace Auto_Screen_Brightness
             overlayPanel.Children.Add(_overlaySlider);
             overlayPanel.Children.Add(overlayHint);
 
+            // Tray settings
+            var trayPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Spacing = 6
+            };
+
+            var trayLabel = new TextBlock
+            {
+                Text = "Settings",
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                FontSize = 13
+            };
+
+            _minimizeToTrayToggle = new ToggleSwitch
+            {
+                Header = "Minimize to tray on close",
+                IsOn = SettingsManager.Settings.MinimizeToTrayOnClose
+            };
+            _minimizeToTrayToggle.Toggled += (_, __) =>
+            {
+                SettingsManager.Settings.MinimizeToTrayOnClose = _minimizeToTrayToggle.IsOn;
+                SettingsManager.Save();
+            };
+
+            _startupToggle = new ToggleSwitch
+            {
+                Header = "Start with Windows",
+                IsOn = SettingsManager.Settings.StartWithWindows
+            };
+            _startupToggle.Toggled += (_, __) =>
+            {
+                SettingsManager.Settings.StartWithWindows = _startupToggle.IsOn;
+                StartupManager.SetStartup(_startupToggle.IsOn);
+                SettingsManager.Save();
+            };
+
+            trayPanel.Children.Add(trayLabel);
+            trayPanel.Children.Add(_minimizeToTrayToggle);
+            trayPanel.Children.Add(_startupToggle);
+
+            // Schedule button
+            var scheduleButton = new Button
+            {
+                Content = "Schedule Management",
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            scheduleButton.Click += ScheduleButton_Click;
+
             _statusText = new TextBlock
             {
                 Text = "Status: Ready",
@@ -95,6 +149,8 @@ namespace Auto_Screen_Brightness
             stack.Children.Add(_currentBrightnessText);
             stack.Children.Add(_brightnessSlider);
             stack.Children.Add(overlayPanel);
+            stack.Children.Add(trayPanel);
+            stack.Children.Add(scheduleButton);
             stack.Children.Add(_statusText);
 
             var grid = new Grid { Padding = new Microsoft.UI.Xaml.Thickness(20) };
@@ -104,6 +160,43 @@ namespace Auto_Screen_Brightness
 
             // Initialize brightness state after UI constructed
             RefreshCurrentBrightness();
+            
+            // Initialize schedule manager
+            ScheduleManager.Instance.Initialize(OnScheduleTriggered);
+
+            // Initialize tray manager
+            TrayIconManager.Initialize(this);
+
+            // Handle window closing
+            this.Closed += (_, __) =>
+            {
+                if (SettingsManager.Settings.MinimizeToTrayOnClose)
+                {
+                    TrayIconManager.HideWindow(this);
+                }
+                else
+                {
+                    Environment.Exit(0);
+                }
+            };
+        }
+
+        private void ScheduleButton_Click(object sender, RoutedEventArgs e)
+        {
+            var scheduleWindow = new ScheduleWindow();
+            scheduleWindow.Activate();
+        }
+
+        private void OnScheduleTriggered(int brightness)
+        {
+            var dq = this.DispatcherQueue;
+            if (dq != null)
+            {
+                dq.TryEnqueue(() =>
+                {
+                    _brightnessSlider.Value = brightness;
+                });
+            }
         }
 
         private async void BrightnessSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -113,13 +206,13 @@ namespace Auto_Screen_Brightness
 
             var result = await Task.Run(() => TrySetBrightness(level, out var msg) ? (true, msg: string.Empty) : (false, msg));
 
-            // UI ½º·¹µå·Î ¾ÈÀüÇÏ°Ô ¸¶¼£¸µ
+            // UI ìŠ¤ë ˆë“œë¡œ ì•ˆì „í•˜ê²Œ ë§ˆìƒ¬ë§
             var dq = this.DispatcherQueue;
             if (dq != null)
             {
                 dq.TryEnqueue(() =>
                 {
-                    if (_statusText == null) return; // Ãß°¡ ¾ÈÀü °Ë»ç
+                    if (_statusText == null) return; // ì¶”ê°€ ì•ˆì „ ê²€ì‚¬
                     _statusText.Text = result.Item1 ? "Status: Brightness applied" : $"Status: Failed - {result.msg}";
                     if (_overlayToggle != null && _overlayToggle.IsOn)
                     {
@@ -129,7 +222,7 @@ namespace Auto_Screen_Brightness
             }
             else
             {
-                // ÃÖÈÄÀÇ ¼ö´Ü: ¿¹¿Ü °¡´É¼º °¨¼öÇÏ°í Á÷Á¢ ¼³Á¤
+                // ìµœí›„ì˜ ìˆ˜ë‹¨: ì˜ˆì™¸ ê°€ëŠ¥ì„± ê°ìˆ˜í•˜ê³  ì§ì ‘ ì„¤ì •
                 _statusText.Text = result.Item1 ? "Status: Brightness applied" : $"Status: Failed - {result.msg}";
                 if (_overlayToggle != null && _overlayToggle.IsOn)
                 {
