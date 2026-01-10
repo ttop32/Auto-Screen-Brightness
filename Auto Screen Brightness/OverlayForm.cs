@@ -75,8 +75,9 @@ namespace Auto_Screen_Brightness
                 SetWindowLong(h, GWL_EXSTYLE, (int)newExStyle);
             }
 
-            // Ensure layered and set full alpha so Opacity works reliably
-            SetLayeredWindowAttributes(h, 0, 255, LWA_ALPHA);
+            // Ensure layered and set alpha according to the current Opacity so initial state matches requested opacity
+            byte alpha = (byte)Math.Clamp((int)Math.Round(Opacity * 255.0), 0, 255);
+            SetLayeredWindowAttributes(h, 0, alpha, LWA_ALPHA);
 
             // Ensure window is topmost without activating it
             SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
