@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
+using System.IO;
 
 namespace Auto_Screen_Brightness
 {
@@ -15,9 +16,9 @@ namespace Auto_Screen_Brightness
         {
             _icon = new NotifyIcon
             {
-                Icon = SystemIcons.Application,
+                Icon = GetApplicationIcon() ?? SystemIcons.Application,
                 Visible = true,
-                Text = "Auto Screen Brightness"
+                Text = AppInfo.GetAppName()
             };
 
             var menu = new ContextMenuStrip();
@@ -30,6 +31,26 @@ namespace Auto_Screen_Brightness
                 if (e.Button == MouseButtons.Left)
                     OnLeftClick?.Invoke();
             };
+        }
+
+        private Icon GetApplicationIcon()
+        {
+            try
+            {
+                var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Square44x44Logo.targetsize-24_altform-unplated.png");
+                if (File.Exists(iconPath))
+                {
+                    using (var bitmap = new Bitmap(iconPath))
+                    {
+                        return Icon.FromHandle(bitmap.GetHicon());
+                    }
+                }
+            }
+            catch
+            {
+                // Fallback to system icon
+            }
+            return null;
         }
 
         public void Show() => _icon.Visible = true;

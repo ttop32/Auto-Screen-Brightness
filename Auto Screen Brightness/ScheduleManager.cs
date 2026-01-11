@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -53,7 +53,34 @@ namespace Auto_Screen_Brightness
         {
             _onScheduleTriggered = onScheduleTriggered;
             LoadSchedules();
+            
+            // Apply the most recent schedule at current time on initialization
+            ApplyMostRecentSchedule();
+            
             StartScheduleMonitoring();
+        }
+        private void ApplyMostRecentSchedule() {
+            var now = DateTime.Now.TimeOfDay;
+
+            var enabledSchedules = _schedules
+                .Where(s => s.IsEnabled)
+                .OrderBy(s => s.Time)
+                .ToList();
+
+            if (!enabledSchedules.Any())
+                return;
+
+            var mostRecentSchedule = enabledSchedules
+                .LastOrDefault(s => s.Time <= now);
+
+            if (mostRecentSchedule == null) {
+                mostRecentSchedule = enabledSchedules.Last();
+            }
+
+            _onScheduleTriggered?.Invoke(
+                mostRecentSchedule.Brightness,
+                mostRecentSchedule.OverlayBrightness
+            );
         }
 
         public void AddSchedule(TimeSpan time, int brightness)

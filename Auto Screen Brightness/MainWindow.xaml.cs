@@ -1,11 +1,14 @@
-﻿using Microsoft.UI.Xaml;
+﻿using Microsoft.UI;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using System;
 using System.Linq;
-using System.Management;
 using System.Threading.Tasks;
 using Windows.UI.ViewManagement;
+using WinRT.Interop;
+using Microsoft.UI.Windowing;
+
 
 namespace Auto_Screen_Brightness
 {
@@ -14,7 +17,6 @@ namespace Auto_Screen_Brightness
         private TextBlock _currentBrightnessText;
         private TextBlock _currentOverlayBrightnessText;
         private Slider _brightnessSlider;
-        private TextBlock _statusText;
 
         // Overlay UI
         private Slider _overlaySlider;
@@ -64,7 +66,7 @@ namespace Auto_Screen_Brightness
 
             // Overlay controls
             _currentOverlayBrightnessText = new TextBlock {
-                Text = "Current: --%",
+                Text = "Overlay: --%",
                 HorizontalAlignment = HorizontalAlignment.Center
             };
 
@@ -122,22 +124,17 @@ namespace Auto_Screen_Brightness
             trayPanel.Children.Add(_minimizeToTrayToggle);
             trayPanel.Children.Add(_startupToggle);
 
-
-
-
-            _statusText = new TextBlock
-            {
-                Text = "Status: Ready",
-                TextWrapping = TextWrapping.Wrap
-            };
-
-
-            // Schedule button
-            var scheduleButton = new Button {
-                Content = "Schedule Management",
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            scheduleButton.Click += ScheduleButton_Click;
+            //var startMinimizedToggle = new ToggleSwitch
+            //{
+            //    Header = "Start minimized to tray",
+            //    IsOn = SettingsManager.Settings.StartMinimizedToTray
+            //};
+            //startMinimizedToggle.Toggled += (_, __) =>
+            //{
+            //    SettingsManager.Settings.StartMinimizedToTray = startMinimizedToggle.IsOn;
+            //    SettingsManager.Save();
+            //};
+            //trayPanel.Children.Add(startMinimizedToggle);
 
 
             // Time selection
@@ -167,8 +164,6 @@ namespace Auto_Screen_Brightness
 
 
             timePanel.Children.Add(timePicker);
-            
-
             timePanel.Children.Add(addButton);
 
 
@@ -209,9 +204,8 @@ namespace Auto_Screen_Brightness
 
 
             stack.Children.Add(trayPanel);
-            stack.Children.Add(_statusText);
-            stack.Children.Add(timePanel);
             stack.Children.Add(listTitle);
+            stack.Children.Add(timePanel);
             stack.Children.Add(listScroll);
 
 
@@ -219,6 +213,20 @@ namespace Auto_Screen_Brightness
             grid.Children.Add(stack);
 
             Content = grid;
+            
+            // Set window title to app name
+            Title = AppInfo.GetAppName();
+            
+            // Set window icon from assets
+            try
+            {
+                var iconPath = "ms-appx:///Assets/Square44x44Logo.targetsize-24_altform-unplated.png";
+                this.SetWindowIcon(iconPath);
+            }
+            catch
+            {
+                // Fallback if icon setting fails
+            }
 
             // Initialize brightness state after UI constructed
             RefreshCurrentBrightness();
@@ -229,39 +237,52 @@ namespace Auto_Screen_Brightness
             // Initialize tray manager
             TrayIconManager.Initialize(this);
 
-            // Handle window closing
-            this.Closed += (_, __) =>
+            //// Handle window closing
+            var hwnd = WindowNative.GetWindowHandle(this);
+            var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
+            AppWindow appWindow = AppWindow.GetFromWindowId(windowId);
+            appWindow.Closing += (s, e) =>
             {
-                if (SettingsManager.Settings.MinimizeToTrayOnClose)
-                {
+                if (SettingsManager.Settings.MinimizeToTrayOnClose) {
+                    e.Cancel = true;
                     TrayIconManager.HideWindow(this);
-                }
-                else
-                {
+                } else {
                     Environment.Exit(0);
                 }
             };
         }
 
-        private void ScheduleButton_Click(object sender, RoutedEventArgs e)
-        {
-            var scheduleWindow = new ScheduleWindow();
-            scheduleWindow.Activate();
-        }
-
+        
         private void OnScheduleTriggered(int brightness, int overlayBrightness)
         {
-            var dq = this.DispatcherQueue;
-            if (dq != null)
+            // Apply brightness directly without UI dependency
+            Task.Run(() =>
             {
-                dq.TryEnqueue(() =>
+                // Apply main brightness
+                BrightnessManager.SetBrightness(brightness, out _);
+
+                // Handle overlay
+                if (overlayBrightness >= 100)
                 {
-                    _brightnessSlider.Value = brightness;
-                    _overlaySlider.Value = overlayBrightness;
-                    
-                    // Overlay will be automatically managed by OverlaySlider_ValueChanged
-                });
-            }
+                    OverlayManager.Stop();
+                }
+                else
+                {
+                    // Start or update overlay - OverlayManager.Start now handles duplicates internally
+                    OverlayManager.Start(overlayBrightness);
+                }
+
+                // Update UI if window is still available
+                var dq = this.DispatcherQueue;
+                if (dq != null)
+                {
+                    dq.TryEnqueue(() =>
+                    {
+                        if (_brightnessSlider != null) _brightnessSlider.Value = brightness;
+                        if (_overlaySlider != null) _overlaySlider.Value = overlayBrightness;
+                    });
+                }
+            });
         }
 
         private async void BrightnessSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -269,18 +290,16 @@ namespace Auto_Screen_Brightness
             var level = Convert.ToInt32(_brightnessSlider.Value);
             _currentBrightnessText.Text = $"Brightness: {level}%";
 
-            var result = await Task.Run(() => TrySetBrightness(level, out var msg) ? (true, msg: string.Empty) : (false, msg));
+            var result = await Task.Run(() => BrightnessManager.SetBrightness(level, out var msg) ? (true, msg: string.Empty) : (false, msg));
 
-            // UI 스레드로 안전하게 마샬링
             var dq = this.DispatcherQueue;
             if (dq != null)
             {
                 dq.TryEnqueue(() =>
                 {
-                    if (_statusText == null) return;
-                    _statusText.Text = result.Item1 ? "Status: Brightness applied" : $"Status: Failed - {result.msg}";
+                    //if (_statusText == null) return;
+                    //_statusText.Text = result.Item1 ? "Status: Brightness applied" : $"Status: Failed - {result.msg}";
                     
-                    // Update overlay if it's enabled
                     var overlayVal = Convert.ToInt32(_overlaySlider.Value);
 
                     if (overlayVal < 100)
@@ -289,10 +308,6 @@ namespace Auto_Screen_Brightness
                     }
                 });
             }
-            else
-            {
-                _statusText.Text = result.Item1 ? "Status: Brightness applied" : $"Status: Failed - {result.msg}";
-            }
         }
 
         private void OverlaySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
@@ -300,100 +315,34 @@ namespace Auto_Screen_Brightness
             var val = Convert.ToInt32(_overlaySlider.Value);
             _currentOverlayBrightnessText.Text = $"Overlay: {val}%";
 
-            // Auto-manage overlay based on slider value
             if (val >= 100)
             {
-                // 100% = no overlay, stop overlay
                 OverlayManager.Stop();
-                _statusText.Text = "Status: Overlay disabled";
+                //_statusText.Text = "Status: Overlay disabled";
             }
             else
             {
-                // Below 100% = enable overlay and apply brightness
                 if (!OverlayManager.IsRunning()) {
                     OverlayManager.Start(val);
                 }
                 OverlayManager.UpdateOpacity(val);
-                _statusText.Text = $"Status: Overlay enabled ({val}%)";
+                //_statusText.Text = $"Status: Overlay enabled ({val}%)";
             }
         }
 
         private void RefreshCurrentBrightness()
         {
-            var (success, value, message) = TryGetCurrentBrightness();
+            var (success, value, message) = BrightnessManager.GetCurrentBrightness();
             if (success)
             {
                 _brightnessSlider.Value = value;
-                // default overlay level to current brightness
-                if (_overlaySlider != null) _overlaySlider.Value = value;
+                //if (_overlaySlider != null) _overlaySlider.Value = value;
                 _currentBrightnessText.Text = $"Current: {value}%";
-                _statusText.Text = "Status: Current brightness loaded";
+                //_statusText.Text = "Status: Current brightness loaded";
             }
             else
             {
-                _statusText.Text = $"Status: Failed to read - {message}";
-            }
-        }
-
-        // Reads current brightness using WmiMonitorBrightness (root\\wmi)
-        private (bool success, int value, string message) TryGetCurrentBrightness()
-        {
-            try
-            {
-                var scope = new ManagementScope(@"\\.\root\wmi");
-                scope.Connect();
-
-                var query = new SelectQuery("WmiMonitorBrightness");
-                using var searcher = new ManagementObjectSearcher(scope, query);
-                foreach (ManagementObject obj in searcher.Get())
-                {
-                    using (var mo = obj)
-                    {
-                        var current = mo.GetPropertyValue("CurrentBrightness");
-                        if (current != null && int.TryParse(current.ToString(), out var brightness))
-                        {
-                            return (true, brightness, string.Empty);
-                        }
-                    }
-                }
-
-                return (false, 0, "No WmiMonitorBrightness instances found");
-            }
-            catch (Exception ex)
-            {
-                return (false, 0, ex.Message);
-            }
-        }
-
-        // Sets brightness using WmiMonitorBrightnessMethods.WmiSetBrightness (root\\wmi)
-        private bool TrySetBrightness(int level, out string message)
-        {
-            message = string.Empty;
-            try
-            {
-                // Level should be 0-100
-                level = Math.Clamp(level, 0, 100);
-
-                var scope = new ManagementScope(@"\\.\root\wmi");
-                scope.Connect();
-
-                using var mclass = new ManagementClass(scope, new ManagementPath("WmiMonitorBrightnessMethods"), new ObjectGetOptions());
-                foreach (ManagementObject obj in mclass.GetInstances())
-                {
-                    using (var mo = obj)
-                    {
-                        // WmiSetBrightness takes (Timeout:uint32, Brightness:uint32)
-                        var inParams = new object[] { (uint)1, (uint)level };
-                        mo.InvokeMethod("WmiSetBrightness", inParams);
-                    }
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                message = ex.Message;
-                return false;
+                //_statusText.Text = $"Status: Failed to read - {message}";
             }
         }
 
@@ -489,18 +438,13 @@ namespace Auto_Screen_Brightness
             var brightness = Convert.ToInt32(_brightnessSlider.Value);
             var overlayBrightness = Convert.ToInt32(_overlaySlider.Value);
             
-            // Check if schedule with same time already exists
             if (!ScheduleManager.Instance.CanAddSchedule(_selectedTime))
             {
-                _statusText.Text = "Status: 같은 시간대의 스케줄이 이미 존재합니다";
                 return;
             }
             
             ScheduleManager.Instance.AddScheduleWithOverlay(_selectedTime, brightness, overlayBrightness);
             
-            
-
-            _statusText.Text = "Status: 스케줄이 추가되었습니다";
         }
     }
 }

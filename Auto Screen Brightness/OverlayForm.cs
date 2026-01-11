@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
@@ -129,61 +131,120 @@ namespace Auto_Screen_Brightness
 
     internal static class OverlayManager
     {
-        private static Thread? _thread;
-        private static volatile OverlayForm? _form;
-
+        private static List<Thread> _threads = new();
+        private static List<OverlayForm> _forms = new();
+        private static readonly object _lock = new object();
+        private static bool _isStarting = false;
 
         public static void Start(int brightnessPercent)
         {
-            Stop();
-
-            double overlayOpacity = Math.Min(0.7, (100 - Math.Clamp(brightnessPercent, 0, 100)) / 100.0);
-
-
-            var t = new Thread(() =>
+            lock (_lock)
             {
-                Application.SetHighDpiMode(HighDpiMode.SystemAware);
-                Application.EnableVisualStyles();
-                Application.SetCompatibleTextRenderingDefault(false);
+                // If already running or starting, don't start again
+                if (_isStarting || IsRunning())
+                {
+                    UpdateOpacity(brightnessPercent);
+                    return;
+                }
 
-                _form = new OverlayForm(overlayOpacity);
-                Application.Run(_form);
-            });
+                _isStarting = true;
+            }
 
-            t.IsBackground = true;
-            t.SetApartmentState(ApartmentState.STA);
-            _thread = t;
-            t.Start();
+            try
+            {
+                Stop();
+
+                double overlayOpacity = Math.Min(0.7, (100 - Math.Clamp(brightnessPercent, 0, 100)) / 100.0);
+
+                // Get all screens and create an overlay for each
+                var screens = Screen.AllScreens;
+
+                foreach (var screen in screens)
+                {
+                    var t = new Thread(() =>
+                    {
+                        try
+                        {
+                            Application.SetHighDpiMode(HighDpiMode.SystemAware);
+                            Application.EnableVisualStyles();
+                            Application.SetCompatibleTextRenderingDefault(false);
+
+                            var form = new OverlayForm(overlayOpacity);
+                            // Set the form bounds to the specific screen
+                            form.Bounds = screen.Bounds;
+                            
+                            lock (_lock)
+                            {
+                                _forms.Add(form);
+                            }
+
+                            Application.Run(form);
+                        }
+                        catch
+                        {
+                            // swallow exceptions from individual screen threads
+                        }
+                    });
+
+                    t.IsBackground = true;
+                    t.SetApartmentState(ApartmentState.STA);
+                    
+                    lock (_lock)
+                    {
+                        _threads.Add(t);
+                    }
+                    
+                    t.Start();
+                }
+            }
+            finally
+            {
+                lock (_lock)
+                {
+                    _isStarting = false;
+                }
+            }
         }
 
         public static void Stop()
         {
             try
             {
-                // Capture local reference to avoid race where _form becomes null between checks
-                var form = _form;
-                if (form != null && !form.IsDisposed)
+                List<OverlayForm> formsToClose;
+                List<Thread> threadsToWait;
+
+                lock (_lock)
                 {
-                    if (form.InvokeRequired)
-                    {
-                        // Use BeginInvoke on the form thread to close it; capture local form reference
-                        form.BeginInvoke(new Action(() =>
-                        {
-                            try
-                            {
-                                if (!form.IsDisposed) form.Close();
-                            }
-                            catch
-                            {
-                                // swallow
-                            }
-                        }));
-                    }
-                    else
+                    formsToClose = new List<OverlayForm>(_forms);
+                    threadsToWait = new List<Thread>(_threads);
+                    _forms.Clear();
+                    _threads.Clear();
+                }
+
+                foreach (var form in formsToClose)
+                {
+                    if (form != null && !form.IsDisposed)
                     {
                         try
                         {
-                            if (!form.IsDisposed) form.Close();
+                            if (form.InvokeRequired)
+                            {
+                                form.BeginInvoke(new Action(() =>
+                                {
+                                    try
+                                    {
+                                        if (!form.IsDisposed) form.Close();
+                                    }
+                                    catch
+                                    {
+                                        // swallow
+                                    }
+                                }));
+                            }
+                            else
+                            {
+                                if (!form.IsDisposed) form.Close();
+                            }
                         }
                         catch
                         {
@@ -192,12 +253,13 @@ namespace Auto_Screen_Brightness
                     }
                 }
 
-                // Clear shared reference after requesting close
-                _form = null;
-
-                if (_thread != null && _thread.IsAlive)
+                // Wait for threads to complete
+                foreach (var thread in threadsToWait)
                 {
-                    _thread = null; // thread will exit when form closes
+                    if (thread != null && thread.IsAlive)
+                    {
+                        thread.Join(TimeSpan.FromSeconds(5));
+                    }
                 }
             }
             catch
@@ -208,27 +270,36 @@ namespace Auto_Screen_Brightness
 
         public static void UpdateOpacity(int brightnessPercent)
         {
-            // Capture local reference to avoid NRE when _form is changed concurrently
-            var form = _form;
-            if (form == null) return;
-            double overlayOpacity = Math.Min(0.7, (100 - Math.Clamp(brightnessPercent, 0, 100)) / 100.0);
-            try
+            List<OverlayForm> formsToUpdate;
+            
+            lock (_lock)
             {
-                form.SetOverlayOpacity(overlayOpacity);
+                formsToUpdate = new List<OverlayForm>(_forms);
             }
-            catch
+
+            double overlayOpacity = Math.Min(0.7, (100 - Math.Clamp(brightnessPercent, 0, 100)) / 100.0);
+            
+            foreach (var form in formsToUpdate)
             {
-                // swallow any cross-thread race exceptions
+                if (form == null) continue;
+                try
+                {
+                    form.SetOverlayOpacity(overlayOpacity);
+                }
+                catch
+                {
+                    // swallow any cross-thread race exceptions
+                }
             }
         }
-        public static bool IsRunning() {
-            var form = _form;
-            var thread = _thread;
-
-            return form != null
-                   && !form.IsDisposed
-                   && thread != null
-                   && thread.IsAlive;
+        
+        public static bool IsRunning()
+        {
+            lock (_lock)
+            {
+                return _forms.Any(f => f != null && !f.IsDisposed) &&
+                       _threads.Any(t => t != null && t.IsAlive);
+            }
         }
     }
 }

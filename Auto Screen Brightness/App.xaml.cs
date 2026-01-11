@@ -15,8 +15,19 @@ namespace Auto_Screen_Brightness
 
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
+            SettingsManager.Load();
+
             _window = new MainWindow();
+            
+            //// If configured to start minimized to tray, hide the window immediately
+            //if (SettingsManager.Settings.StartMinimizedToTray)
+            //{
+            //    // Don't activate, let it stay hidden
+            //}
+            //else
+            //{
             _window.Activate();
+            //}
         }
     }
 }

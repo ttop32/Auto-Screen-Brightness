@@ -8,6 +8,7 @@ namespace Auto_Screen_Brightness
     {
         public bool MinimizeToTrayOnClose { get; set; } = true;
         public bool StartWithWindows { get; set; } = false;
+        public bool StartMinimizedToTray { get; set; } = true;
     }
 
     public static class SettingsManager
