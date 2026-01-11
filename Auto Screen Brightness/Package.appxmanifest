@@ -11,12 +11,12 @@
 	<Identity
 	  Name="a59dd1c5-f94f-4a81-b345-90a8cf251acb"
 	  Publisher="CN=TSOP"
-	  Version="1.0.9.0" />
+	  Version="1.0.10.0" />
 
 	<!-- ================= App Properties ================= -->
 	<Properties>
 		<DisplayName>Auto Screen Brightness</DisplayName>
-		<PublisherDisplayName>TSOP</PublisherDisplayName>
+		<PublisherDisplayName>ttop324</PublisherDisplayName>
 		<Logo>Assets\StoreLogo.png</Logo>
 	</Properties>
 
