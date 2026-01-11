@@ -21,7 +21,6 @@ namespace Auto_Screen_Brightness {
         private const int SW_SHOW = 5;
         private const int SW_RESTORE = 9;
 
-        // 초기화
         public static void Initialize(Window window) {
             _hwnd = WindowNative.GetWindowHandle(window);
             _icon = new NotifyIconWrapper();
@@ -34,7 +33,6 @@ namespace Auto_Screen_Brightness {
             };
         }
 
-        // 기존 코드와 호환
         public static void HideWindow(Window window) {
             ShowWindow(_hwnd, SW_HIDE);
         }
