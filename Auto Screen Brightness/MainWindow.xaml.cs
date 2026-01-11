@@ -147,19 +147,17 @@ namespace Auto_Screen_Brightness
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
 
-            _timeDisplay = new TextBlock {
-                Text = "00:00",
-                VerticalAlignment = VerticalAlignment.Center,
-                MinWidth = 60
-            };
-
-            var timeButton = new Button { Content = "Select Time" };
-            timeButton.Click += TimeButton_Click;
-
+            var now = DateTime.Now;
             var timePicker = new TimePicker {
-                ClockIdentifier = "24HourClock", // 24시간제
+                ClockIdentifier = "24HourClock",
                 MinuteIncrement = 1,
+                Time = new TimeSpan(now.Hour, now.Minute, 0)
             };
+            _selectedTime = timePicker.Time;
+            timePicker.TimeChanged += (sender, e) =>
+             {
+                 _selectedTime = timePicker.Time;
+             };
 
             var addButton = new Button {
                 Content = "Add Schedule"
@@ -167,9 +165,7 @@ namespace Auto_Screen_Brightness
             addButton.Click += AddButton_Click;
 
 
-            //timePanel.Children.Add(new TextBlock { Text = "Time:", VerticalAlignment = VerticalAlignment.Center });
-            //timePanel.Children.Add(_timeDisplay);
-            //timePanel.Children.Add(timeButton);
+
             timePanel.Children.Add(timePicker);
             
 
@@ -201,9 +197,7 @@ namespace Auto_Screen_Brightness
             };
 
 
-            // Initialize with current time
-            _selectedTime = DateTime.Now.TimeOfDay;
-            _timeDisplay.Text = _selectedTime.ToString(@"hh\:mm");
+            
 
 
 
@@ -420,7 +414,7 @@ namespace Auto_Screen_Brightness
                 };
 
                 itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });
-                itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
                 itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -489,25 +483,6 @@ namespace Auto_Screen_Brightness
             }
         }
 
-        private void TimeButton_Click(object sender, RoutedEventArgs e) {
-            var timePicker = new TimePicker();
-            timePicker.Time = _selectedTime;
-
-            var dialog = new ContentDialog {
-                Title = "Select Time",
-                Content = timePicker,
-                PrimaryButtonText = "OK",
-                CloseButtonText = "Cancel",
-                XamlRoot = this.Content.XamlRoot
-            };
-
-            dialog.PrimaryButtonClick += (s, args) => {
-                _selectedTime = timePicker.Time;
-                _timeDisplay.Text = _selectedTime.ToString(@"hh\:mm");
-            };
-
-            _ = dialog.ShowAsync();
-        }
 
         
         private void AddButton_Click(object sender, RoutedEventArgs e) {
@@ -523,10 +498,8 @@ namespace Auto_Screen_Brightness
             
             ScheduleManager.Instance.AddScheduleWithOverlay(_selectedTime, brightness, overlayBrightness);
             
-            // Reset to current time
-            _selectedTime = DateTime.Now.TimeOfDay;
-            _timeDisplay.Text = _selectedTime.ToString(@"hh\:mm");
             
+
             _statusText.Text = "Status: 스케줄이 추가되었습니다";
         }
     }
