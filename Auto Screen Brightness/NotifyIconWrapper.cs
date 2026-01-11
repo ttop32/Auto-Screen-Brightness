@@ -9,8 +9,8 @@ namespace Auto_Screen_Brightness
     {
         private NotifyIcon _icon;
 
-        public event Action OnLeftClick;
-        public event Action OnExit;
+        public event Action? OnLeftClick;
+        public event Action? OnExit;
 
         public NotifyIconWrapper()
         {
@@ -33,7 +33,7 @@ namespace Auto_Screen_Brightness
             };
         }
 
-        private Icon GetApplicationIcon()
+        private Icon? GetApplicationIcon()
         {
             try
             {

@@ -26,11 +26,11 @@ namespace Auto_Screen_Brightness
 
     public class ScheduleManager
     {
-        private static ScheduleManager _instance;
+        private static ScheduleManager? _instance;
         private ObservableCollection<ScheduleEntry> _schedules = new();
-        private CancellationTokenSource _cancellationTokenSource;
-        private Task _scheduleTask;
-        private Action<int, int> _onScheduleTriggered;
+        private CancellationTokenSource? _cancellationTokenSource;
+        private Task? _scheduleTask;
+        private Action<int, int>? _onScheduleTriggered;
         private int _nextId = 1;
         private string _schedulesFilePath;
 

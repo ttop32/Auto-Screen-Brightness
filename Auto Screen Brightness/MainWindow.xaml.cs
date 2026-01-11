@@ -24,8 +24,6 @@ namespace Auto_Screen_Brightness
         private ToggleSwitch _startupToggle;
 
         private StackPanel _scheduleList;
-        private TextBlock _timeDisplay;
-        private TextBlock _brightnessDisplay;
         private TimeSpan _selectedTime = TimeSpan.Zero;
 
         public MainWindow()
@@ -113,28 +111,28 @@ namespace Auto_Screen_Brightness
                 Header = "Start with Windows",
                 IsOn = SettingsManager.Settings.StartWithWindows
             };
-            _startupToggle.Toggled += (_, __) =>
+            _startupToggle.Loaded += async (_, __) => await LoadStartupSettingAsync();
+            _startupToggle.Toggled += async (_, __) =>
             {
+                if (_startupToggle.IsOn) {
+                    var enabled = await StartupManager.EnableAsync();
+
+                    // 사용자가 Windows 팝업에서 거부한 경우
+                    if (!enabled) {
+                        _startupToggle.IsOn = false;
+                        return;
+                    }
+                } else {
+                    await StartupManager.DisableAsync();
+                }
+
                 SettingsManager.Settings.StartWithWindows = _startupToggle.IsOn;
-                StartupManager.SetStartup(_startupToggle.IsOn);
                 SettingsManager.Save();
             };
 
             trayPanel.Children.Add(trayLabel);
             trayPanel.Children.Add(_minimizeToTrayToggle);
             trayPanel.Children.Add(_startupToggle);
-
-            //var startMinimizedToggle = new ToggleSwitch
-            //{
-            //    Header = "Start minimized to tray",
-            //    IsOn = SettingsManager.Settings.StartMinimizedToTray
-            //};
-            //startMinimizedToggle.Toggled += (_, __) =>
-            //{
-            //    SettingsManager.Settings.StartMinimizedToTray = startMinimizedToggle.IsOn;
-            //    SettingsManager.Save();
-            //};
-            //trayPanel.Children.Add(startMinimizedToggle);
 
 
             // Time selection
@@ -237,7 +235,8 @@ namespace Auto_Screen_Brightness
             // Initialize tray manager
             TrayIconManager.Initialize(this);
 
-            //// Handle window closing
+            
+            // Handle window closing
             var hwnd = WindowNative.GetWindowHandle(this);
             var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
             AppWindow appWindow = AppWindow.GetFromWindowId(windowId);
@@ -252,7 +251,10 @@ namespace Auto_Screen_Brightness
             };
         }
 
-        
+        private async Task LoadStartupSettingAsync() {
+            _startupToggle.IsOn = await StartupManager.IsEnabledAsync();
+        }
+
         private void OnScheduleTriggered(int brightness, int overlayBrightness)
         {
             // Apply brightness directly without UI dependency
@@ -419,7 +421,7 @@ namespace Auto_Screen_Brightness
                     BorderBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red),
                     BorderThickness = new Thickness(1),
 
-                    CornerRadius = new CornerRadius(16), // Width/Height의 절반
+                    CornerRadius = new CornerRadius(16),
                     Padding = new Thickness(0)
                 };
                 deleteButton.Click += (s, e) => {
@@ -432,8 +434,6 @@ namespace Auto_Screen_Brightness
             }
         }
 
-
-        
         private void AddButton_Click(object sender, RoutedEventArgs e) {
             var brightness = Convert.ToInt32(_brightnessSlider.Value);
             var overlayBrightness = Convert.ToInt32(_overlaySlider.Value);
@@ -444,7 +444,6 @@ namespace Auto_Screen_Brightness
             }
             
             ScheduleManager.Instance.AddScheduleWithOverlay(_selectedTime, brightness, overlayBrightness);
-            
         }
     }
 }
