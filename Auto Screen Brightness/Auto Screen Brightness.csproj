@@ -65,12 +65,13 @@
     <PublishReadyToRun>false</PublishReadyToRun>
     <PublishTrimmed>false</PublishTrimmed>
     <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
-	<AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>	  
+	<AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>	  
     <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
     <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
     <GenerateTestArtifacts>True</GenerateTestArtifacts>
     <AppxBundle>Auto</AppxBundle>
     <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
-    <AppxBundlePlatforms>x86|x64|arm64</AppxBundlePlatforms>
+    <AppxBundlePlatforms>x86|x64</AppxBundlePlatforms>
+    <PackageCertificateThumbprint>95E80F6A022AFED89003011B8CB80C0771E3F610</PackageCertificateThumbprint>
   </PropertyGroup>
 </Project>

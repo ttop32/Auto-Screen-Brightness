@@ -10,8 +10,8 @@
 	<!-- ================= App Identity ================= -->
 	<Identity
 	  Name="36727ttop324.501010139CE6B"
-	  Publisher="CN=CFAA9C3F-1495-460F-A740-897FED00D564"
-	  Version="1.0.11.0" />
+	  Publisher="CN=ttop324"
+	  Version="1.0.16.0" />
 
 	<!-- ================= App Properties ================= -->
 	<Properties>
