@@ -8,7 +8,7 @@ namespace Auto_Screen_Brightness
     public static class TrayIconManager
     {
         private static IntPtr _hwnd;
-        private static NotifyIconWrapper _icon;
+        private static NotifyIconWrapper? _icon;
 
         public static void Initialize(Window window)
         {

@@ -7,7 +7,7 @@ namespace Auto_Screen_Brightness
 {
     public class NotifyIconWrapper : IDisposable
     {
-        private NotifyIcon _icon;
+        private NotifyIcon? _icon;
 
         public event Action? OnLeftClick;
         public event Action? OnExit;
@@ -53,12 +53,19 @@ namespace Auto_Screen_Brightness
             return null;
         }
 
-        public void Show() => _icon.Visible = true;
+        public void Show()
+        {
+            if (_icon != null)
+                _icon.Visible = true;
+        }
 
         public void Dispose()
         {
-            _icon.Visible = false;
-            _icon.Dispose();
+            if (_icon != null)
+            {
+                _icon.Visible = false;
+                _icon.Dispose();
+            }
         }
     }
 }
