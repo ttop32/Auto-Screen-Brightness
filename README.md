@@ -1,7 +1,22 @@
 # Auto Screen Brightness
 
-A lightweight Windows utility for controlling screen brightness.    
+![Auto Screen Brightness Screenshot](screen77.png)
+
+**Auto Screen Brightness** is a powerful Windows app designed to automatically adjust your screen and overlay brightness according to your daily schedule. Optimize your display for productivity, comfort, and energy efficiency with precise control.
+
+## Download
 
 
+## Key Features
+- **Scheduled Brightness Adjustment** – Set custom schedules to automatically change your screen brightness throughout the day.
+- **Overlay Brightness Control** – Fine-tune overlay brightness independently for reading, gaming, or night-time use.
+- **Smart Automation** – Reduce eye strain and improve focus by automatically adapting your display to your environment and routine.
+- **User-Friendly Interface** – Intuitive controls make scheduling and adjustments effortless.
+- **Energy Efficient** – Save battery and reduce power consumption with automated brightness management.
 
-https://www.flaticon.com/free-icon/brightness_1076531
+## Why Auto Screen Brightness?
+Whether you work late nights, play games, or need a comfortable reading experience, Auto Screen Brightness ensures your screen is always optimized. Control both **screen and overlay brightness** seamlessly with a **customizable daily schedule**.
+
+## References / Acknowledgements
+- https://www.flaticon.com/free-icon/brightness_1076531
+
