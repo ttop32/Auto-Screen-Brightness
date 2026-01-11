@@ -232,10 +232,6 @@ namespace Auto_Screen_Brightness
             // Initialize schedule manager
             ScheduleManager.Instance.Initialize(OnScheduleTriggered);
 
-            // Initialize tray manager
-            TrayIconManager.Initialize(this);
-
-            
             // Handle window closing
             var hwnd = WindowNative.GetWindowHandle(this);
             var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
