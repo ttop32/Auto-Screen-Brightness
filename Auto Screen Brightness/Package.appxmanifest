@@ -2,50 +2,79 @@
 
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
-  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  IgnorableNamespaces="uap uap5 rescap">
 
-  <Identity
-    Name="a59dd1c5-f94f-4a81-b345-90a8cf251acb"
-    Publisher="CN=TSOP"
-    Version="1.0.0.0" />
+	<!-- ================= App Identity ================= -->
+	<Identity
+	  Name="a59dd1c5-f94f-4a81-b345-90a8cf251acb"
+	  Publisher="CN=TSOP"
+	  Version="1.0.9.0" />
 
-  <mp:PhoneIdentity PhoneProductId="a59dd1c5-f94f-4a81-b345-90a8cf251acb" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
+	<!-- ================= App Properties ================= -->
+	<Properties>
+		<DisplayName>Auto Screen Brightness</DisplayName>
+		<PublisherDisplayName>TSOP</PublisherDisplayName>
+		<Logo>Assets\StoreLogo.png</Logo>
+	</Properties>
 
-  <Properties>
-    <DisplayName>Auto Screen Brightness</DisplayName>
-    <PublisherDisplayName>TSOP</PublisherDisplayName>
-    <Logo>Assets\StoreLogo.png</Logo>
-  </Properties>
+	<!-- ================= Target Devices ================= -->
+	<Dependencies>
+		<!-- Desktop-only WinUI 3 application -->
+		<TargetDeviceFamily
+		  Name="Windows.Desktop"
+		  MinVersion="10.0.17763.0"
+		  MaxVersionTested="10.0.19041.0" />
+	</Dependencies>
 
-  <Dependencies>
-    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.19041.0" />
-  </Dependencies>
+	<!-- ================= Localization ================= -->
+	<Resources>
+		<Resource Language="x-generate"/>
+	</Resources>
 
-  <Resources>
-    <Resource Language="x-generate"/>
-  </Resources>
+	<!-- ================= Application Definition ================= -->
+	<Applications>
+		<Application
+		  Id="App"
+		  Executable="$targetnametoken$.exe"
+		  EntryPoint="$targetentrypoint$">
 
-  <Applications>
-    <Application Id="App"
-      Executable="$targetnametoken$.exe"
-      EntryPoint="$targetentrypoint$">
-      <uap:VisualElements
-        DisplayName="Auto Screen Brightness"
-        Description="Auto Screen Brightness"
-        BackgroundColor="transparent"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
-        <uap:SplashScreen Image="Assets\SplashScreen.png" />
-      </uap:VisualElements>
-    </Application>
-  </Applications>
+			<!-- Startup task declaration (user consent required) -->
+			<Extensions>
+				<uap5:Extension Category="windows.startupTask">
+					<uap5:StartupTask
+					  TaskId="AutoScreenBrightnessStartup"
+					  Enabled="false"
+					  DisplayName="Auto Screen Brightness" />
+				</uap5:Extension>
+			</Extensions>
 
-  <Capabilities>
-    <rescap:Capability Name="runFullTrust" />
-  </Capabilities>
+			<!-- Visual assets for Start menu, taskbar, and tiles -->
+			<uap:VisualElements
+			  DisplayName="Auto Screen Brightness"
+			  Description="Automatically adjusts screen brightness based on your settings."
+			  BackgroundColor="transparent"
+			  Square150x150Logo="Assets\Square150x150Logo.png"
+			  Square44x44Logo="Assets\Square44x44Logo.png">
+
+				<uap:DefaultTile
+				  Wide310x150Logo="Assets\Wide310x150Logo.png"
+				  Square71x71Logo="Assets\SmallTile.png"
+				  Square310x310Logo="Assets\LargeTile.png" />
+
+				<!-- Splash screen image -->
+				<uap:SplashScreen Image="Assets\SplashScreen.png"/>
+			</uap:VisualElements>
+
+		</Application>
+	</Applications>
+
+	<!-- ================= Capabilities ================= -->
+	<Capabilities>
+		<!-- Required to access Win32 APIs for system brightness control -->
+		<rescap:Capability Name="runFullTrust" />
+	</Capabilities>
+
 </Package>
