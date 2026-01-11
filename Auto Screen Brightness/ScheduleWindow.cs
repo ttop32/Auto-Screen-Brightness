@@ -187,8 +187,7 @@ namespace Auto_Screen_Brightness
                 itemPanel.Children.Add(timeText);
 
                 // Brightness
-                var brightnessText = new TextBlock
-                {
+                var brightnessText = new TextBlock {
                     Text = $"{schedule.Brightness}%",
                     VerticalAlignment = VerticalAlignment.Center,
                     FontSize = 13,

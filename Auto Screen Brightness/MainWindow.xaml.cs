@@ -1,23 +1,30 @@
-﻿using System;
-using System.Management;
-using System.Threading.Tasks;
-using Microsoft.UI.Xaml;
+﻿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using System;
+using System.Linq;
+using System.Management;
+using System.Threading.Tasks;
+using Windows.UI.ViewManagement;
 
 namespace Auto_Screen_Brightness
 {
     public sealed partial class MainWindow : Window
     {
         private TextBlock _currentBrightnessText;
+        private TextBlock _currentOverlayBrightnessText;
         private Slider _brightnessSlider;
         private TextBlock _statusText;
 
         // Overlay UI
-        private ToggleSwitch _overlayToggle;
         private Slider _overlaySlider;
         private ToggleSwitch _minimizeToTrayToggle;
         private ToggleSwitch _startupToggle;
+
+        private StackPanel _scheduleList;
+        private TextBlock _timeDisplay;
+        private TextBlock _brightnessDisplay;
+        private TimeSpan _selectedTime = TimeSpan.Zero;
 
         public MainWindow()
         {
@@ -29,7 +36,7 @@ namespace Auto_Screen_Brightness
             {
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Width = 360,
+                Width = 400,
                 Spacing = 12
             };
 
@@ -56,23 +63,10 @@ namespace Auto_Screen_Brightness
             _brightnessSlider.ValueChanged += BrightnessSlider_ValueChanged;
 
             // Overlay controls
-            var overlayPanel = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Spacing = 6
+            _currentOverlayBrightnessText = new TextBlock {
+                Text = "Current: --%",
+                HorizontalAlignment = HorizontalAlignment.Center
             };
-
-            var overlayHeader = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Spacing = 8
-            };
-
-            _overlayToggle = new ToggleSwitch { Header = "Use Overlay" };
-            _overlayToggle.Toggled += OverlayToggle_Toggled;
-
-            overlayHeader.Children.Add(_overlayToggle);
 
             _overlaySlider = new Slider
             {
@@ -84,12 +78,9 @@ namespace Auto_Screen_Brightness
             };
             _overlaySlider.ValueChanged += OverlaySlider_ValueChanged;
 
-            var overlayHint = new TextBlock { Text = "Overlay brightness (perceived): 100% = no overlay", FontSize = 12 };
+            
 
-            overlayPanel.Children.Add(overlayHeader);
-            overlayPanel.Children.Add(_overlaySlider);
-            overlayPanel.Children.Add(overlayHint);
-
+            
             // Tray settings
             var trayPanel = new StackPanel
             {
@@ -131,13 +122,8 @@ namespace Auto_Screen_Brightness
             trayPanel.Children.Add(_minimizeToTrayToggle);
             trayPanel.Children.Add(_startupToggle);
 
-            // Schedule button
-            var scheduleButton = new Button
-            {
-                Content = "Schedule Management",
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            scheduleButton.Click += ScheduleButton_Click;
+
+
 
             _statusText = new TextBlock
             {
@@ -145,13 +131,95 @@ namespace Auto_Screen_Brightness
                 TextWrapping = TextWrapping.Wrap
             };
 
+
+            // Schedule button
+            var scheduleButton = new Button {
+                Content = "Schedule Management",
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            scheduleButton.Click += ScheduleButton_Click;
+
+
+            // Time selection
+            var timePanel = new StackPanel {
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            _timeDisplay = new TextBlock {
+                Text = "00:00",
+                VerticalAlignment = VerticalAlignment.Center,
+                MinWidth = 60
+            };
+
+            var timeButton = new Button { Content = "Select Time" };
+            timeButton.Click += TimeButton_Click;
+
+            var timePicker = new TimePicker {
+                ClockIdentifier = "24HourClock", // 24시간제
+                MinuteIncrement = 1,
+            };
+
+            var addButton = new Button {
+                Content = "Add Schedule"
+            };
+            addButton.Click += AddButton_Click;
+
+
+            //timePanel.Children.Add(new TextBlock { Text = "Time:", VerticalAlignment = VerticalAlignment.Center });
+            //timePanel.Children.Add(_timeDisplay);
+            //timePanel.Children.Add(timeButton);
+            timePanel.Children.Add(timePicker);
+            
+
+            timePanel.Children.Add(addButton);
+
+
+
+            // Schedule list
+            var listTitle = new TextBlock {
+                Text = "Schedules",
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold
+            };
+
+            _scheduleList = new StackPanel {
+                Orientation = Orientation.Vertical,
+                Spacing = 4
+            };
+
+            // Update the display with current schedules
+            RefreshScheduleList();
+
+            // Subscribe to collection changes
+            ScheduleManager.Instance.Schedules.CollectionChanged += (s, e) => RefreshScheduleList();
+
+            var listScroll = new ScrollViewer {
+                Content = _scheduleList,
+                Height = 300,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            };
+
+
+            // Initialize with current time
+            _selectedTime = DateTime.Now.TimeOfDay;
+            _timeDisplay.Text = _selectedTime.ToString(@"hh\:mm");
+
+
+
             stack.Children.Add(title);
             stack.Children.Add(_currentBrightnessText);
             stack.Children.Add(_brightnessSlider);
-            stack.Children.Add(overlayPanel);
+            stack.Children.Add(_currentOverlayBrightnessText);
+            stack.Children.Add(_overlaySlider);
+
+
             stack.Children.Add(trayPanel);
-            stack.Children.Add(scheduleButton);
             stack.Children.Add(_statusText);
+            stack.Children.Add(timePanel);
+            stack.Children.Add(listTitle);
+            stack.Children.Add(listScroll);
+
 
             var grid = new Grid { Padding = new Microsoft.UI.Xaml.Thickness(20) };
             grid.Children.Add(stack);
@@ -187,7 +255,7 @@ namespace Auto_Screen_Brightness
             scheduleWindow.Activate();
         }
 
-        private void OnScheduleTriggered(int brightness)
+        private void OnScheduleTriggered(int brightness, int overlayBrightness)
         {
             var dq = this.DispatcherQueue;
             if (dq != null)
@@ -195,6 +263,9 @@ namespace Auto_Screen_Brightness
                 dq.TryEnqueue(() =>
                 {
                     _brightnessSlider.Value = brightness;
+                    _overlaySlider.Value = overlayBrightness;
+                    
+                    // Overlay will be automatically managed by OverlaySlider_ValueChanged
                 });
             }
         }
@@ -202,7 +273,7 @@ namespace Auto_Screen_Brightness
         private async void BrightnessSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
             var level = Convert.ToInt32(_brightnessSlider.Value);
-            _currentBrightnessText.Text = $"Current: {level}%";
+            _currentBrightnessText.Text = $"Brightness: {level}%";
 
             var result = await Task.Run(() => TrySetBrightness(level, out var msg) ? (true, msg: string.Empty) : (false, msg));
 
@@ -212,47 +283,44 @@ namespace Auto_Screen_Brightness
             {
                 dq.TryEnqueue(() =>
                 {
-                    if (_statusText == null) return; // 추가 안전 검사
+                    if (_statusText == null) return;
                     _statusText.Text = result.Item1 ? "Status: Brightness applied" : $"Status: Failed - {result.msg}";
-                    if (_overlayToggle != null && _overlayToggle.IsOn)
+                    
+                    // Update overlay if it's enabled
+                    var overlayVal = Convert.ToInt32(_overlaySlider.Value);
+
+                    if (overlayVal < 100)
                     {
-                        OverlayManager.UpdateOpacity(level);
+                        OverlayManager.UpdateOpacity(overlayVal);
                     }
                 });
             }
             else
             {
-                // 최후의 수단: 예외 가능성 감수하고 직접 설정
                 _statusText.Text = result.Item1 ? "Status: Brightness applied" : $"Status: Failed - {result.msg}";
-                if (_overlayToggle != null && _overlayToggle.IsOn)
-                {
-                    OverlayManager.UpdateOpacity(level);
-                }
-            }
-        }
-
-        private void OverlayToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (_overlayToggle.IsOn)
-            {
-                var val = Convert.ToInt32(_overlaySlider.Value);
-                OverlayManager.Start(val);
-                _statusText.Text = $"Status: Overlay enabled ({val}%)";
-            }
-            else
-            {
-                OverlayManager.Stop();
-                _statusText.Text = "Status: Overlay disabled";
             }
         }
 
         private void OverlaySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
             var val = Convert.ToInt32(_overlaySlider.Value);
-            if (_overlayToggle != null && _overlayToggle.IsOn)
+            _currentOverlayBrightnessText.Text = $"Overlay: {val}%";
+
+            // Auto-manage overlay based on slider value
+            if (val >= 100)
             {
+                // 100% = no overlay, stop overlay
+                OverlayManager.Stop();
+                _statusText.Text = "Status: Overlay disabled";
+            }
+            else
+            {
+                // Below 100% = enable overlay and apply brightness
+                if (!OverlayManager.IsRunning()) {
+                    OverlayManager.Start(val);
+                }
                 OverlayManager.UpdateOpacity(val);
-                _statusText.Text = $"Status: Overlay updated ({val}%)";
+                _statusText.Text = $"Status: Overlay enabled ({val}%)";
             }
         }
 
@@ -333,6 +401,133 @@ namespace Auto_Screen_Brightness
                 message = ex.Message;
                 return false;
             }
+        }
+
+
+
+        private void RefreshScheduleList() {
+            _scheduleList.Children.Clear();
+
+            var sortedSchedules = ScheduleManager.Instance.Schedules.OrderBy(s => s.Time).ToList();
+
+            foreach (var schedule in sortedSchedules) {
+                var itemPanel = new Grid {
+                    Padding = new Thickness(12, 10, 12, 10),
+                    Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White) { Opacity = 0.15 },
+                    Margin = new Thickness(0, 4, 0, 4),
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
+                };
+
+                itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });
+                itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                // Time
+                var timeText = new TextBlock {
+                    Text = schedule.Time.ToString(@"hh\:mm"),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    FontSize = 14,
+                    FontWeight = Microsoft.UI.Text.FontWeights.Bold,
+                    Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White)
+                };
+                Grid.SetColumn(timeText, 0);
+                itemPanel.Children.Add(timeText);
+
+                // Brightness
+                var brightnessText = new TextBlock {
+                    Text = $"{schedule.Brightness}%, {schedule.OverlayBrightness}%",
+                    VerticalAlignment = VerticalAlignment.Center,
+                    FontSize = 13,
+                    Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White)
+                };
+                Grid.SetColumn(brightnessText, 1);
+                itemPanel.Children.Add(brightnessText);
+
+
+                // Spacer
+                Grid.SetColumn(new TextBlock(), 2);
+
+                // Toggle switch
+                var toggleSwitch = new ToggleSwitch {
+                    IsOn = schedule.IsEnabled,
+                    Margin = new Thickness(0, 0, 8, 0)
+                };
+                toggleSwitch.Toggled += (s, e) => {
+                    ScheduleManager.Instance.ToggleSchedule(schedule);
+                    RefreshScheduleList();
+                };
+                Grid.SetColumn(toggleSwitch, 3);
+                itemPanel.Children.Add(toggleSwitch);
+
+
+                // Delete button
+                var deleteButton = new Button {
+                    Content = "✕",
+                    Width = 32,
+                    Height = 32,
+                    FontSize = 14,
+
+                    Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red),
+                    Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                    BorderBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red),
+                    BorderThickness = new Thickness(1),
+
+                    CornerRadius = new CornerRadius(16), // Width/Height의 절반
+                    Padding = new Thickness(0)
+                };
+                deleteButton.Click += (s, e) => {
+                    ScheduleManager.Instance.RemoveSchedule(schedule);
+                };
+                Grid.SetColumn(deleteButton, 4);
+                itemPanel.Children.Add(deleteButton);
+
+                _scheduleList.Children.Add(itemPanel);
+            }
+        }
+
+        private void TimeButton_Click(object sender, RoutedEventArgs e) {
+            var timePicker = new TimePicker();
+            timePicker.Time = _selectedTime;
+
+            var dialog = new ContentDialog {
+                Title = "Select Time",
+                Content = timePicker,
+                PrimaryButtonText = "OK",
+                CloseButtonText = "Cancel",
+                XamlRoot = this.Content.XamlRoot
+            };
+
+            dialog.PrimaryButtonClick += (s, args) => {
+                _selectedTime = timePicker.Time;
+                _timeDisplay.Text = _selectedTime.ToString(@"hh\:mm");
+            };
+
+            _ = dialog.ShowAsync();
+        }
+
+        
+        private void AddButton_Click(object sender, RoutedEventArgs e) {
+            var brightness = Convert.ToInt32(_brightnessSlider.Value);
+            var overlayBrightness = Convert.ToInt32(_overlaySlider.Value);
+            
+            // Check if schedule with same time already exists
+            if (!ScheduleManager.Instance.CanAddSchedule(_selectedTime))
+            {
+                _statusText.Text = "Status: 같은 시간대의 스케줄이 이미 존재합니다";
+                return;
+            }
+            
+            ScheduleManager.Instance.AddScheduleWithOverlay(_selectedTime, brightness, overlayBrightness);
+            
+            // Reset to current time
+            _selectedTime = DateTime.Now.TimeOfDay;
+            _timeDisplay.Text = _selectedTime.ToString(@"hh\:mm");
+            
+            _statusText.Text = "Status: 스케줄이 추가되었습니다";
         }
     }
 }

@@ -132,11 +132,13 @@ namespace Auto_Screen_Brightness
         private static Thread? _thread;
         private static volatile OverlayForm? _form;
 
+
         public static void Start(int brightnessPercent)
         {
             Stop();
 
-            double overlayOpacity = (100 - Math.Clamp(brightnessPercent, 0, 100)) / 100.0;
+            double overlayOpacity = Math.Min(0.7, (100 - Math.Clamp(brightnessPercent, 0, 100)) / 100.0);
+
 
             var t = new Thread(() =>
             {
@@ -209,7 +211,7 @@ namespace Auto_Screen_Brightness
             // Capture local reference to avoid NRE when _form is changed concurrently
             var form = _form;
             if (form == null) return;
-            double overlayOpacity = (100 - Math.Clamp(brightnessPercent, 0, 100)) / 100.0;
+            double overlayOpacity = Math.Min(0.7, (100 - Math.Clamp(brightnessPercent, 0, 100)) / 100.0);
             try
             {
                 form.SetOverlayOpacity(overlayOpacity);
@@ -218,6 +220,15 @@ namespace Auto_Screen_Brightness
             {
                 // swallow any cross-thread race exceptions
             }
+        }
+        public static bool IsRunning() {
+            var form = _form;
+            var thread = _thread;
+
+            return form != null
+                   && !form.IsDisposed
+                   && thread != null
+                   && thread.IsAlive;
         }
     }
 }

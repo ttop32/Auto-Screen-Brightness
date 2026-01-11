@@ -14,6 +14,7 @@ namespace Auto_Screen_Brightness
         public int Id { get; set; }
         public TimeSpan Time { get; set; }
         public int Brightness { get; set; }
+        public int OverlayBrightness { get; set; }
         public bool IsEnabled { get; set; } = true;
 
         public override string ToString()
@@ -29,7 +30,7 @@ namespace Auto_Screen_Brightness
         private ObservableCollection<ScheduleEntry> _schedules = new();
         private CancellationTokenSource _cancellationTokenSource;
         private Task _scheduleTask;
-        private Action<int> _onScheduleTriggered;
+        private Action<int, int> _onScheduleTriggered;
         private int _nextId = 1;
         private string _schedulesFilePath;
 
@@ -48,7 +49,7 @@ namespace Auto_Screen_Brightness
             _schedulesFilePath = Path.Combine(appFolder, "schedules.json");
         }
 
-        public void Initialize(Action<int> onScheduleTriggered)
+        public void Initialize(Action<int, int> onScheduleTriggered)
         {
             _onScheduleTriggered = onScheduleTriggered;
             LoadSchedules();
@@ -62,6 +63,25 @@ namespace Auto_Screen_Brightness
                 Id = _nextId++,
                 Time = time,
                 Brightness = brightness,
+                IsEnabled = true
+            };
+            _schedules.Add(entry);
+            SaveSchedules();
+        }
+
+        public bool CanAddSchedule(TimeSpan time)
+        {
+            return !_schedules.Any(s => s.Time == time);
+        }
+
+        public void AddScheduleWithOverlay(TimeSpan time, int brightness, int overlayBrightness)
+        {
+            var entry = new ScheduleEntry
+            {
+                Id = _nextId++,
+                Time = time,
+                Brightness = brightness,
+                OverlayBrightness = overlayBrightness,
                 IsEnabled = true
             };
             _schedules.Add(entry);
@@ -150,7 +170,7 @@ namespace Auto_Screen_Brightness
                         var timeDiff = currentTime - schedule.Time;
                         if (timeDiff.TotalSeconds >= 0 && timeDiff.TotalSeconds < 30 && (now - lastTriggeredTime).TotalSeconds > 60)
                         {
-                            _onScheduleTriggered?.Invoke(schedule.Brightness);
+                            _onScheduleTriggered?.Invoke(schedule.Brightness, schedule.OverlayBrightness);
                             lastTriggeredTime = now;
                             break;
                         }
