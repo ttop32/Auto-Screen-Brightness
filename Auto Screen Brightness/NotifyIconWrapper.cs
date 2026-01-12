@@ -8,22 +8,26 @@ namespace Auto_Screen_Brightness
     public class NotifyIconWrapper : IDisposable
     {
         private NotifyIcon? _icon;
+        private bool _disposed;
 
         public event Action? OnLeftClick;
         public event Action? OnExit;
 
         public NotifyIconWrapper()
         {
+            InitializeNotifyIcon();
+        }
+
+        private void InitializeNotifyIcon()
+        {
             _icon = new NotifyIcon
             {
                 Icon = GetApplicationIcon() ?? SystemIcons.Application,
                 Visible = true,
-                Text = AppInfo.GetAppName()
+                Text = AppInfo.Name
             };
 
-            var menu = new ContextMenuStrip();
-            menu.Items.Add("Open", null, (_, __) => OnLeftClick?.Invoke());
-            menu.Items.Add("Exit", null, (_, __) => OnExit?.Invoke());
+            var menu = CreateContextMenu();
             _icon.ContextMenuStrip = menu;
 
             _icon.MouseClick += (s, e) =>
@@ -33,6 +37,14 @@ namespace Auto_Screen_Brightness
             };
         }
 
+        private ContextMenuStrip CreateContextMenu()
+        {
+            var menu = new ContextMenuStrip();
+            menu.Items.Add("Open", null, (_, __) => OnLeftClick?.Invoke());
+            menu.Items.Add("Exit", null, (_, __) => OnExit?.Invoke());
+            return menu;
+        }
+
         private Icon? GetApplicationIcon()
         {
             try
@@ -40,10 +52,8 @@ namespace Auto_Screen_Brightness
                 var iconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "Square44x44Logo.targetsize-24_altform-unplated.png");
                 if (File.Exists(iconPath))
                 {
-                    using (var bitmap = new Bitmap(iconPath))
-                    {
-                        return Icon.FromHandle(bitmap.GetHicon());
-                    }
+                    using var bitmap = new Bitmap(iconPath);
+                    return Icon.FromHandle(bitmap.GetHicon());
                 }
             }
             catch
@@ -55,17 +65,30 @@ namespace Auto_Screen_Brightness
 
         public void Show()
         {
-            if (_icon != null)
+            if (_icon != null && !_disposed)
                 _icon.Visible = true;
+        }
+
+        public void Hide()
+        {
+            if (_icon != null && !_disposed)
+                _icon.Visible = false;
         }
 
         public void Dispose()
         {
+            if (_disposed)
+                return;
+
+            _disposed = true;
             if (_icon != null)
             {
                 _icon.Visible = false;
+                _icon.ContextMenuStrip?.Dispose();
                 _icon.Dispose();
             }
+
+            GC.SuppressFinalize(this);
         }
     }
 }

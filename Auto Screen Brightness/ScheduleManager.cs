@@ -33,8 +33,10 @@ namespace Auto_Screen_Brightness
         private Action<int, int>? _onScheduleTriggered;
         private int _nextId = 1;
         private string _schedulesFilePath;
+        private bool _isInitialized = false;
 
         public ObservableCollection<ScheduleEntry> Schedules => _schedules;
+        public bool IsInitialized => _isInitialized;
 
         public static ScheduleManager Instance
         {
@@ -51,6 +53,10 @@ namespace Auto_Screen_Brightness
 
         public void Initialize(Action<int, int> onScheduleTriggered)
         {
+            if (_isInitialized)
+                return;
+
+            _isInitialized = true;
             _onScheduleTriggered = onScheduleTriggered;
             LoadSchedules();
             
