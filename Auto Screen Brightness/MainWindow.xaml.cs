@@ -240,7 +240,7 @@ namespace Auto_Screen_Brightness
             {
                 if (SettingsManager.Settings.MinimizeToTrayOnClose) {
                     e.Cancel = true;
-                    TrayIconManager.HideWindow(this);
+                    TrayIconManager.HideWindow();
                 } else {
                     // Cleanup resources when exiting
                     OverlayManager.Stop();

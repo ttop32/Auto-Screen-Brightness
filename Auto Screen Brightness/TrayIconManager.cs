@@ -6,10 +6,9 @@ using WinRT.Interop;
 namespace Auto_Screen_Brightness {
     public static class TrayIconManager {
         private static IntPtr _hwnd;
+        private static Window? _window;
         private static NotifyIconWrapper? _icon;
-
-        [DllImport("user32.dll")]
-        private static extern bool IsWindowVisible(IntPtr hWnd);
+        private static bool _initialized;
 
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -22,33 +21,41 @@ namespace Auto_Screen_Brightness {
         private const int SW_RESTORE = 9;
 
         public static void Initialize(Window window) {
+            if (_initialized)
+                return;
+
+            _initialized = true;
+            _window = window;
             _hwnd = WindowNative.GetWindowHandle(window);
+
             _icon = new NotifyIconWrapper();
             _icon.Show();
 
             _icon.OnLeftClick += () => {
-                window.DispatcherQueue.TryEnqueue(() => {
-                    ShowWindow(window);
-                });
+                _window.DispatcherQueue.TryEnqueue(ShowWindow);
             };
 
             _icon.OnExit += () => {
-                window.DispatcherQueue.TryEnqueue(() => {
-                    Environment.Exit(0);
-                });
+                Environment.Exit(0);
             };
         }
 
-        public static void HideWindow(Window window) {
+        public static void HideWindow() {
+            if (_hwnd == IntPtr.Zero)
+                return;
+
             ShowWindow(_hwnd, SW_HIDE);
         }
 
-        public static void ShowWindow(Window window) {
+        public static void ShowWindow() {
+            if (_hwnd == IntPtr.Zero || _window == null)
+                return;
+
             ShowWindow(_hwnd, SW_RESTORE);
             ShowWindow(_hwnd, SW_SHOW);
-            SetForegroundWindow(_hwnd);
-            window.Activate();
-        }
 
+            _window.Activate();
+            SetForegroundWindow(_hwnd);
+        }
     }
 }
