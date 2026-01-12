@@ -242,6 +242,9 @@ namespace Auto_Screen_Brightness
                     e.Cancel = true;
                     TrayIconManager.HideWindow(this);
                 } else {
+                    // Cleanup resources when exiting
+                    OverlayManager.Stop();
+                    ScheduleManager.Instance.Stop();
                     Environment.Exit(0);
                 }
             };

@@ -31,6 +31,12 @@ namespace Auto_Screen_Brightness {
                     ShowWindow(window);
                 });
             };
+
+            _icon.OnExit += () => {
+                window.DispatcherQueue.TryEnqueue(() => {
+                    Environment.Exit(0);
+                });
+            };
         }
 
         public static void HideWindow(Window window) {
