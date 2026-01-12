@@ -13,11 +13,15 @@ namespace Auto_Screen_Brightness
 
     public static class SettingsManager
     {
-        private static readonly string _path =
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "AutoScreenBrightness",
-                "settings.json");
+        private static readonly string _settingsDirectory = 
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AutoScreenBrightness");
+        
+        private static readonly string _settingsPath = Path.Combine(_settingsDirectory, "settings.json");
+        
+        private static readonly JsonSerializerOptions _jsonOptions = new()
+        {
+            WriteIndented = true
+        };
 
         public static AppSettings Settings { get; private set; } = new();
 
@@ -25,22 +29,41 @@ namespace Auto_Screen_Brightness
         {
             try
             {
-                if (File.Exists(_path))
+                if (File.Exists(_settingsPath))
                 {
-                    Settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_path))
-                               ?? new AppSettings();
+                    var json = File.ReadAllText(_settingsPath);
+                    Settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+                }
+                else
+                {
+                    Settings = new AppSettings();
                 }
             }
-            catch { Settings = new AppSettings(); }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load settings: {ex.Message}");
+                Settings = new AppSettings();
+            }
         }
 
         public static void Save()
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-            File.WriteAllText(_path, JsonSerializer.Serialize(Settings, new JsonSerializerOptions
+            try
             {
-                WriteIndented = true
-            }));
+                Directory.CreateDirectory(_settingsDirectory);
+                var json = JsonSerializer.Serialize(Settings, _jsonOptions);
+                File.WriteAllText(_settingsPath, json);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to save settings: {ex.Message}");
+            }
+        }
+
+        public static void Reset()
+        {
+            Settings = new AppSettings();
+            Save();
         }
     }
 }

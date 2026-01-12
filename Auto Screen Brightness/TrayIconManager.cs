@@ -20,23 +20,40 @@ namespace Auto_Screen_Brightness {
         private const int SW_SHOW = 5;
         private const int SW_RESTORE = 9;
 
+        public static bool IsInitialized => _initialized;
+
         public static void Initialize(Window window) {
             if (_initialized)
                 return;
 
-            _initialized = true;
-            _window = window;
-            _hwnd = WindowNative.GetWindowHandle(window);
+            try {
+                _initialized = true;
+                _window = window;
+                _hwnd = WindowNative.GetWindowHandle(window);
 
-            _icon = new NotifyIconWrapper();
-            _icon.Show();
+                _icon = new NotifyIconWrapper();
+                _icon.Show();
+
+                SubscribeToEvents();
+            } catch (Exception ex) {
+                System.Diagnostics.Debug.WriteLine($"Failed to initialize TrayIconManager: {ex.Message}");
+                _initialized = false;
+                throw;
+            }
+        }
+
+        private static void SubscribeToEvents() {
+            if (_icon == null)
+                return;
 
             _icon.OnLeftClick += () => {
-                _window.DispatcherQueue.TryEnqueue(ShowWindow);
+                _window?.DispatcherQueue?.TryEnqueue(ShowWindow);
             };
 
             _icon.OnExit += () => {
-                Environment.Exit(0);
+                _window?.DispatcherQueue?.TryEnqueue(() => {
+                    _window?.Close();
+                });
             };
         }
 
@@ -56,6 +73,12 @@ namespace Auto_Screen_Brightness {
 
             _window.Activate();
             SetForegroundWindow(_hwnd);
+        }
+
+        public static void Cleanup() {
+            _icon?.Dispose();
+            _icon = null;
+            _initialized = false;
         }
     }
 }
