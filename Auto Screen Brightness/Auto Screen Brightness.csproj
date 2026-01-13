@@ -1,81 +1,128 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
-    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-    <RootNamespace>Auto_Screen_Brightness</RootNamespace>
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Platforms>x86;x64;ARM64</Platforms>
-    <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
-    <UseWinUI>true</UseWinUI>
-    <UseWindowsForms>true</UseWindowsForms>
-    <UseWPF>false</UseWPF>
-    <WinUISDKReferences>false</WinUISDKReferences>
-    <EnableMsixTooling>true</EnableMsixTooling>
-    <Nullable>enable</Nullable>
-    
-    <!-- Self-contained MSIX 설정 (Windows Forms 호환) -->
-    <SelfContained>true</SelfContained>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <PublishTrimmed>false</PublishTrimmed>
-    <PublishReadyToRun>true</PublishReadyToRun>
-  </PropertyGroup>
-  <ItemGroup>
-    <Page Remove="OverlayWindow.xaml" />
-  </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="Assets\SplashScreen.scale-200.png" />
-    <Content Include="Assets\LockScreenLogo.scale-200.png" />
-    <Content Include="Assets\Square150x150Logo.scale-200.png" />
-    <Content Include="Assets\Square44x44Logo.scale-200.png" />
-    <Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
-    <Content Include="Assets\Wide310x150Logo.scale-200.png" />
-  </ItemGroup>
+	<!-- ========================= -->
+	<!-- DEFAULT -->
+	<!-- ========================= -->
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
 
-  <ItemGroup>
-    <Manifest Include="$(ApplicationManifest)" />
-  </ItemGroup>
+		<TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+		<TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
 
-  <!--
-    Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
-    Tools extension to be activated for this project even if the Windows App SDK Nuget
-    package has not yet been restored.
-  -->
-  <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
-    <ProjectCapability Include="Msix" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7463" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.251106002" />
-    <PackageReference Include="System.Management" Version="10.0.1" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Update="OverlayWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </None>
-  </ItemGroup>
+		<RootNamespace>Auto_Screen_Brightness</RootNamespace>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
 
-  <!--
-    Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution
-    Explorer "Package and Publish" context menu entry to be enabled for this project even if
-    the Windows App SDK Nuget package has not yet been restored.
-  -->
-  <PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
-    <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
-  </PropertyGroup>
+		<!-- MSIX -->
+		<EnableMsixTooling>true</EnableMsixTooling>
+		<GenerateAppInstallerFile>false</GenerateAppInstallerFile>
+		<AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+		<AppxAutoIncrementPackageRevision>true</AppxAutoIncrementPackageRevision>
+		<AppxBundle>Auto</AppxBundle>
+		<AppxBundlePlatforms>x86|x64|arm64</AppxBundlePlatforms>
 
-  <!-- Publish Properties for Self-contained MSIX -->
-  <PropertyGroup>
-    <PublishReadyToRun>true</PublishReadyToRun>
-    <PublishTrimmed>false</PublishTrimmed>
-    <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
-    <AppxPackageSigningEnabled>False</AppxPackageSigningEnabled>	  
-    <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
-    <AppxAutoIncrementPackageRevision>True</AppxAutoIncrementPackageRevision>
-    <GenerateTestArtifacts>True</GenerateTestArtifacts>
-    <AppxBundle>Auto</AppxBundle>
-    <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
-    <AppxBundlePlatforms>x86|x64|arm64</AppxBundlePlatforms>
-  </PropertyGroup>
+		
+		<RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
+
+		<!-- UI -->
+		<UseWinUI>true</UseWinUI>
+		<UseWindowsForms>true</UseWindowsForms>
+		<UseWPF>false</UseWPF>
+		<WinUISDKReferences>false</WinUISDKReferences>
+
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<!-- ========================= -->
+	<!-- PLATFORM -->
+	<!-- ========================= -->
+	<PropertyGroup>
+		<Platforms>x86;x64;ARM64</Platforms>
+	</PropertyGroup>
+
+	<!-- ========================= -->
+	<!-- x86 -->
+	<!-- ========================= -->
+	<PropertyGroup Condition="'$(Platform)'=='x86'">
+		<PlatformTarget>x86</PlatformTarget>
+		<RuntimeIdentifier>win-x86</RuntimeIdentifier>
+		<SelfContained>true</SelfContained>
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+	</PropertyGroup>
+
+	<!-- ========================= -->
+	<!-- x64 -->
+	<!-- ========================= -->
+	<PropertyGroup Condition="'$(Platform)'=='x64'">
+		<PlatformTarget>x64</PlatformTarget>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<SelfContained>true</SelfContained>
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+	</PropertyGroup>
+
+	<!-- ========================= -->
+	<!-- ARM64 -->
+	<!-- ========================= -->
+	<PropertyGroup Condition="'$(Platform)'=='ARM64'">
+		<PlatformTarget>ARM64</PlatformTarget>
+		<RuntimeIdentifier>win-arm64</RuntimeIdentifier>
+		<SelfContained>true</SelfContained>
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+	</PropertyGroup>
+
+	<!-- ========================= -->
+	<!-- Publish -->
+	<!-- ========================= -->
+	<PropertyGroup>
+		<PublishReadyToRun>true</PublishReadyToRun>
+		<PublishTrimmed>false</PublishTrimmed>
+		<AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
+		<GenerateTestArtifacts>true</GenerateTestArtifacts>
+		<HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+	</PropertyGroup>
+
+	<!-- ========================= -->
+	<!-- Assets -->
+	<!-- ========================= -->
+	<ItemGroup>
+		<Content Include="Assets\SplashScreen.scale-200.png" />
+		<Content Include="Assets\LockScreenLogo.scale-200.png" />
+		<Content Include="Assets\Square150x150Logo.scale-200.png" />
+		<Content Include="Assets\Square44x44Logo.scale-200.png" />
+		<Content Include="Assets\Square44x44Logo.targetsize-24_altform-unplated.png" />
+		<Content Include="Assets\Wide310x150Logo.scale-200.png" />
+	</ItemGroup>
+
+	<!-- ========================= -->
+	<!-- XAML -->
+	<!-- ========================= -->
+	<ItemGroup>
+		<Page Remove="OverlayWindow.xaml" />
+		<None Update="OverlayWindow.xaml">
+			<Generator>MSBuild:Compile</Generator>
+		</None>
+	</ItemGroup>
+
+	<!-- ========================= -->
+	<!-- MSIX Capability -->
+	<!-- ========================= -->
+	<ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+		<ProjectCapability Include="Msix" />
+	</ItemGroup>
+
+	<!-- ========================= -->
+	<!-- NuGet -->
+	<!-- ========================= -->
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7463" />
+		<PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.251106002" />
+		<PackageReference Include="System.Management" Version="10.0.1" />
+	</ItemGroup>
+
+	<!-- ========================= -->
+	<!-- VS MENU -->
+	<!-- ========================= -->
+	<PropertyGroup Condition="'$(DisableHasPackageAndPublishMenuAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
+		<HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
+	</PropertyGroup>
+
 </Project>
