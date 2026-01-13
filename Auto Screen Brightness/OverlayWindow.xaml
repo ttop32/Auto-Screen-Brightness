@@ -3,9 +3,7 @@
     x:Class="Auto_Screen_Brightness.OverlayWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    ExtendsContentIntoTitleBar="True"
-    IsAlwaysOnTop="True"
-    WindowStyle="None">
+    ExtendsContentIntoTitleBar="True">
 
     <Grid x:Name="RootGrid" Background="Black" Opacity="0.3"/>
 </Window>
