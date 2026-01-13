@@ -32,6 +32,9 @@ namespace Auto_Screen_Brightness
             SetupWindowProperties();
             RegisterEventHandlers();
             
+            // Initialize brightness state after UI constructed
+            RefreshCurrentBrightness();
+            
             // Delay schedule manager initialization to after window is activated
             this.Activated += (s, e) =>
             {
@@ -89,7 +92,8 @@ namespace Auto_Screen_Brightness
             _currentBrightnessText = new TextBlock
             {
                 Text = "Current: --%",
-                HorizontalAlignment = HorizontalAlignment.Center
+                HorizontalAlignment = HorizontalAlignment.Center,
+                FontSize = 14
             };
 
             _brightnessSlider = new Slider
@@ -104,7 +108,8 @@ namespace Auto_Screen_Brightness
             _currentOverlayBrightnessText = new TextBlock
             {
                 Text = "Overlay: --%",
-                HorizontalAlignment = HorizontalAlignment.Center
+                HorizontalAlignment = HorizontalAlignment.Center,
+                FontSize = 14
             };
 
             _overlaySlider = new Slider
@@ -339,21 +344,16 @@ namespace Auto_Screen_Brightness
 
         private async void BrightnessSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            var level = Convert.ToInt32(_brightnessSlider.Value);
+            var level = Convert.ToInt32(e.NewValue);
             _currentBrightnessText.Text = $"Brightness: {level}%";
 
             await Task.Run(() => BrightnessManager.SetBrightness(level, out var msg));
 
-            var overlayVal = Convert.ToInt32(_overlaySlider.Value);
-            if (overlayVal < 100)
-            {
-                OverlayManager.UpdateOpacity(overlayVal);
-            }
         }
 
         private void OverlaySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
         {
-            var val = Convert.ToInt32(_overlaySlider.Value);
+            var val = Convert.ToInt32(e.NewValue);
             _currentOverlayBrightnessText.Text = $"Overlay: {val}%";
 
             if (val >= 100)
@@ -397,7 +397,7 @@ namespace Auto_Screen_Brightness
             var itemPanel = new Grid
             {
                 Padding = new Thickness(12, 10, 12, 10),
-                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White) { Opacity = 0.15 },
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.LightGray) { Opacity = 0.3 },
                 Margin = new Thickness(0, 4, 0, 4),
                 BorderThickness = new Thickness(1),
                 BorderBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
@@ -416,8 +416,7 @@ namespace Auto_Screen_Brightness
                 Text = schedule.Time.ToString(@"hh\:mm"),
                 VerticalAlignment = VerticalAlignment.Center,
                 FontSize = 14,
-                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White)
+                FontWeight = Microsoft.UI.Text.FontWeights.Bold
             };
             Grid.SetColumn(timeText, 0);
             itemPanel.Children.Add(timeText);
@@ -427,8 +426,7 @@ namespace Auto_Screen_Brightness
             {
                 Text = $"{schedule.Brightness}%, {schedule.OverlayBrightness}%",
                 VerticalAlignment = VerticalAlignment.Center,
-                FontSize = 13,
-                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White)
+                FontSize = 13
             };
             Grid.SetColumn(brightnessText, 1);
             itemPanel.Children.Add(brightnessText);
