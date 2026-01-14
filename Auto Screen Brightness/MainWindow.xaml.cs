@@ -20,22 +20,17 @@ namespace Auto_Screen_Brightness
         private ToggleSwitch _minimizeToTrayToggle = null!;
         private ToggleSwitch _startupToggle = null!;
         private StackPanel _scheduleList = null!;
+        private TimePicker _timePicker = null!;
         private TimeSpan _selectedTime = TimeSpan.Zero;
 
         public MainWindow()
         {
-            // Load settings first
             SettingsManager.Load();
-            
             InitializeComponent();
-            
             SetupWindowProperties();
             RegisterEventHandlers();
-            
-            // Initialize brightness state after UI constructed
             RefreshCurrentBrightness();
-            
-            // Delay schedule manager initialization to after window is activated
+
             this.Activated += (s, e) =>
             {
                 if (ScheduleManager.Instance != null && !ScheduleManager.Instance.IsInitialized)
@@ -47,53 +42,90 @@ namespace Auto_Screen_Brightness
 
         private void InitializeComponent()
         {
-            var stack = CreateMainStack();
-            var grid = new Grid { Padding = new Thickness(20) };
-            grid.Children.Add(stack);
+            var scale = DpiHelper.GetScaleFactor(this);
+            var mainStack = CreateMainStack();
+            
+            // Wrap main stack in ScrollViewer for full window scrolling
+            var scroll = new ScrollViewer
+            {
+                Content = mainStack,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            };
+
+            var grid = new Grid 
+            { 
+                Padding = new Thickness(12 * scale),
+                Background = ThemeManager.GetBackgroundColor()
+            };
+            grid.Children.Add(scroll);
             Content = grid;
+
+            this.Activated += (s, e) =>
+            {
+                var hwnd = WindowNative.GetWindowHandle(this);
+                var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
+                var appWindow = AppWindow.GetFromWindowId(windowId);
+                appWindow.ResizeClient(new Windows.Graphics.SizeInt32((int)(420 * scale), (int)(820 * scale)));
+            };
+
+            ThemeManager.ThemeChanged += (s, e) =>
+            {
+                this.DispatcherQueue?.TryEnqueue(() => RefreshTheme());
+            };
         }
 
         private StackPanel CreateMainStack()
         {
+            var scale = DpiHelper.GetScaleFactor(this);
             var stack = new StackPanel
             {
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Width = 400,
-                Spacing = 12
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Spacing = 8 * scale
             };
 
             stack.Children.Add(CreateTitle());
-            stack.Children.Add(CreateBrightnessSection());
-            stack.Children.Add(CreateSettingsPanel());
-            stack.Children.Add(CreateScheduleSection());
+            stack.Children.Add(CreateBrightnessCard(scale));
+            stack.Children.Add(CreateSettingsCard(scale));
+            stack.Children.Add(CreateScheduleCard(scale));
 
             return stack;
         }
 
         private TextBlock CreateTitle()
         {
+            var scale = DpiHelper.GetScaleFactor(this);
             return new TextBlock
             {
                 Text = "Screen Brightness",
-                FontSize = 20,
-                HorizontalAlignment = HorizontalAlignment.Center
+                FontSize = 18 * scale,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 4 * scale),
+                Foreground = ThemeManager.GetTextColor()
             };
         }
 
-        private StackPanel CreateBrightnessSection()
+        #region Brightness Card
+
+        private StackPanel CreateBrightnessCard(double scale)
         {
-            var section = new StackPanel
+            var card = new StackPanel
             {
                 Orientation = Orientation.Vertical,
-                Spacing = 12
+                Spacing = 6 * scale,
+                Padding = new Thickness(8 * scale),
+                Background = ThemeManager.GetCardBackground(),
+                BorderBrush = ThemeManager.GetBorderBrush(),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6 * scale)
             };
 
             _currentBrightnessText = new TextBlock
             {
-                Text = "Current: --%",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                FontSize = 14
+                Text = "Brightness: --%",
+                FontSize = 12 * scale,
+                Foreground = ThemeManager.GetTextColor()
             };
 
             _brightnessSlider = new Slider
@@ -101,15 +133,16 @@ namespace Auto_Screen_Brightness
                 Minimum = 0,
                 Maximum = 100,
                 SmallChange = 1,
-                LargeChange = 10
+                LargeChange = 10,
+                Margin = new Thickness(0, 2 * scale, 0, 0)
             };
             _brightnessSlider.ValueChanged += BrightnessSlider_ValueChanged;
 
             _currentOverlayBrightnessText = new TextBlock
             {
                 Text = "Overlay: --%",
-                HorizontalAlignment = HorizontalAlignment.Center,
-                FontSize = 14
+                FontSize = 12 * scale,
+                Foreground = ThemeManager.GetTextColor()
             };
 
             _overlaySlider = new Slider
@@ -118,48 +151,94 @@ namespace Auto_Screen_Brightness
                 Maximum = 100,
                 SmallChange = 1,
                 LargeChange = 10,
-                Value = 100
+                Value = 100,
+                Margin = new Thickness(0, 2 * scale, 0, 0)
             };
             _overlaySlider.ValueChanged += OverlaySlider_ValueChanged;
 
-            section.Children.Add(_currentBrightnessText);
-            section.Children.Add(_brightnessSlider);
-            section.Children.Add(_currentOverlayBrightnessText);
-            section.Children.Add(_overlaySlider);
+            card.Children.Add(_currentBrightnessText);
+            card.Children.Add(_brightnessSlider);
+            card.Children.Add(_currentOverlayBrightnessText);
+            card.Children.Add(_overlaySlider);
 
-            return section;
+            return card;
         }
 
-        private StackPanel CreateSettingsPanel()
+        #endregion
+
+        #region Settings Card
+
+        private StackPanel CreateSettingsCard(double scale)
         {
-            var panel = new StackPanel
+            var card = new StackPanel
             {
                 Orientation = Orientation.Vertical,
-                Spacing = 6
+                Spacing = 2 * scale,
+                Padding = new Thickness(8 * scale),
+                Background = ThemeManager.GetCardBackground(),
+                BorderBrush = ThemeManager.GetBorderBrush(),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6 * scale)
             };
 
             var label = new TextBlock
             {
                 Text = "Settings",
-                FontWeight = Microsoft.UI.Text.FontWeights.Bold,
-                FontSize = 13
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 12 * scale,
+                Margin = new Thickness(0, 0, 0, 4 * scale),
+                Foreground = ThemeManager.GetTextColor()
             };
+
+            // Minimize to tray - Grid layout
+            var minimizeGrid = new Grid();
+            minimizeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            minimizeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            minimizeGrid.Margin = new Thickness(0, 2 * scale, 0, 0);
+
+            var minimizeLabel = new TextBlock
+            {
+                Text = "Minimize to tray",
+                FontSize = 12 * scale,
+                Foreground = ThemeManager.GetTextColor(),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(minimizeLabel, 0);
+            minimizeGrid.Children.Add(minimizeLabel);
 
             _minimizeToTrayToggle = new ToggleSwitch
             {
-                Header = "Minimize to tray on close",
-                IsOn = SettingsManager.Settings.MinimizeToTrayOnClose
+                IsOn = SettingsManager.Settings.MinimizeToTrayOnClose,
+                Margin = new Thickness(0, 0, 0, 0)
             };
             _minimizeToTrayToggle.Toggled += (_, __) =>
             {
                 SettingsManager.Settings.MinimizeToTrayOnClose = _minimizeToTrayToggle.IsOn;
                 SettingsManager.Save();
             };
+            Grid.SetColumn(_minimizeToTrayToggle, 1);
+            minimizeGrid.Children.Add(_minimizeToTrayToggle);
+
+            // Start with Windows - Grid layout
+            var startupGrid = new Grid();
+            startupGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            startupGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            startupGrid.Margin = new Thickness(0, 2 * scale, 0, 0);
+
+            var startupLabel = new TextBlock
+            {
+                Text = "Start with Windows",
+                FontSize = 12 * scale,
+                Foreground = ThemeManager.GetTextColor(),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(startupLabel, 0);
+            startupGrid.Children.Add(startupLabel);
 
             _startupToggle = new ToggleSwitch
             {
-                Header = "Start with Windows",
-                IsOn = SettingsManager.Settings.StartWithWindows
+                IsOn = SettingsManager.Settings.StartWithWindows,
+                Margin = new Thickness(0, 0, 0, 0)
             };
             _startupToggle.Loaded += async (_, __) => await LoadStartupSettingAsync();
             _startupToggle.Toggled += async (_, __) =>
@@ -177,98 +256,231 @@ namespace Auto_Screen_Brightness
                 {
                     await StartupManager.DisableAsync();
                 }
-
                 SettingsManager.Settings.StartWithWindows = _startupToggle.IsOn;
                 SettingsManager.Save();
             };
+            Grid.SetColumn(_startupToggle, 1);
+            startupGrid.Children.Add(_startupToggle);
 
-            panel.Children.Add(label);
-            panel.Children.Add(_minimizeToTrayToggle);
-            panel.Children.Add(_startupToggle);
+            card.Children.Add(label);
+            card.Children.Add(minimizeGrid);
+            card.Children.Add(startupGrid);
 
-            return panel;
+            return card;
         }
 
-        private StackPanel CreateScheduleSection()
+        #endregion
+
+        #region Schedule Card
+
+        private Grid CreateScheduleCard(double scale)
         {
-            var section = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Spacing = 8
-            };
+            var card = new Grid();
+            card.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            card.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            card.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-            var timePanel = CreateTimeSelectionPanel();
-            var listSection = CreateScheduleListSection();
-
-            section.Children.Add(timePanel);
-            section.Children.Add(listSection);
-
-            return section;
-        }
-
-        private StackPanel CreateTimeSelectionPanel()
-        {
-            var panel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Spacing = 8,
-                HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-
-            var now = DateTime.Now;
-            var timePicker = new TimePicker
-            {
-                ClockIdentifier = "24HourClock",
-                MinuteIncrement = 1,
-                Time = new TimeSpan(now.Hour, now.Minute, 0)
-            };
-            _selectedTime = timePicker.Time;
-            timePicker.TimeChanged += (sender, e) => { _selectedTime = timePicker.Time; };
-
-            var addButton = new Button { Content = "Add Schedule" };
-            addButton.Click += AddButton_Click;
-
-            panel.Children.Add(timePicker);
-            panel.Children.Add(addButton);
-
-            return panel;
-        }
-
-        private StackPanel CreateScheduleListSection()
-        {
-            var section = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Spacing = 8
-            };
-
+            // Title
             var title = new TextBlock
             {
                 Text = "Schedules",
-                FontWeight = Microsoft.UI.Text.FontWeights.Bold
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontSize = 12 * scale,
+                Margin = new Thickness(0, 0, 0, 2 * scale),
+                Foreground = ThemeManager.GetTextColor()
+            };
+            Grid.SetRow(title, 0);
+            card.Children.Add(title);
+
+            // Time Picker Panel
+            var timePanel = CreateTimePickerPanel(scale);
+            Grid.SetRow(timePanel, 1);
+            card.Children.Add(timePanel);
+
+            // Schedule List Container with ScrollViewer
+            var scroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Margin = new Thickness(0, 4 * scale, 0, 0)
             };
 
             _scheduleList = new StackPanel
             {
                 Orientation = Orientation.Vertical,
-                Spacing = 4
+                Spacing = 2 * scale
             };
 
             RefreshScheduleList();
             ScheduleManager.Instance.Schedules.CollectionChanged += (s, e) => RefreshScheduleList();
 
-            var scroll = new ScrollViewer
+            scroll.Content = _scheduleList;
+            Grid.SetRow(scroll, 2);
+            card.Children.Add(scroll);
+
+            return card;
+        }
+
+        private StackPanel CreateTimePickerPanel(double scale)
+        {
+            var panel = new StackPanel
             {
-                Content = _scheduleList,
-                Height = 300,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                Orientation = Orientation.Vertical,
+                Spacing = 4 * scale,
+                Padding = new Thickness(8 * scale),
+                Background = ThemeManager.GetCardBackground(),
+                BorderBrush = ThemeManager.GetBorderBrush(),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6 * scale)
             };
 
-            section.Children.Add(title);
-            section.Children.Add(scroll);
+            var label = new TextBlock
+            {
+                Text = "Add Schedule",
+                FontSize = 11 * scale,
+                Foreground = ThemeManager.GetTextColor(),
+                Margin = new Thickness(0, 0, 0, 2 * scale)
+            };
 
-            return section;
+            var inputPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6 * scale,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            var now = DateTime.Now;
+            _timePicker = new TimePicker
+            {
+                ClockIdentifier = "24HourClock",
+                MinuteIncrement = 1,
+                Time = new TimeSpan(now.Hour, now.Minute, 0)
+            };
+            _selectedTime = _timePicker.Time;
+            _timePicker.TimeChanged += (sender, e) => { _selectedTime = _timePicker.Time; };
+
+            var addButton = new Button
+            {
+                Content = "Add",
+                Padding = new Thickness(12 * scale, 4 * scale, 12 * scale, 4 * scale),
+                FontSize = 12 * scale
+            };
+            addButton.Click += AddButton_Click;
+
+            inputPanel.Children.Add(_timePicker);
+            inputPanel.Children.Add(addButton);
+
+            panel.Children.Add(label);
+            panel.Children.Add(inputPanel);
+
+            return panel;
         }
+
+        #endregion
+
+        #region Schedule List
+
+        private void RefreshScheduleList()
+        {
+            _scheduleList.Children.Clear();
+            var scale = DpiHelper.GetScaleFactor(this);
+
+            var sortedSchedules = ScheduleManager.Instance.Schedules.OrderBy(s => s.Time).ToList();
+
+            foreach (var schedule in sortedSchedules)
+            {
+                _scheduleList.Children.Add(CreateScheduleItemPanel(schedule, scale));
+            }
+        }
+
+        private Grid CreateScheduleItemPanel(ScheduleEntry schedule, double scale)
+        {
+            var itemPanel = new Grid
+            {
+                Padding = new Thickness(8 * scale, 6 * scale, 8 * scale, 6 * scale),
+                Background = ThemeManager.GetCardBackground(),
+                BorderBrush = ThemeManager.GetBorderBrush(),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4 * scale),
+                Margin = new Thickness(0, 1 * scale, 0, 1 * scale)
+            };
+
+            itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(50 * scale) });
+            itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20 * scale) });
+            itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            // Time
+            var timeText = new TextBlock
+            {
+                Text = schedule.Time.ToString(@"hh\:mm"),
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 12 * scale,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = ThemeManager.GetTextColor()
+            };
+            Grid.SetColumn(timeText, 0);
+            itemPanel.Children.Add(timeText);
+
+            // Brightness info
+            var brightnessText = new TextBlock
+            {
+                Text = $"{schedule.Brightness}% {schedule.OverlayBrightness}%",
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 11 * scale,
+                Foreground = ThemeManager.GetTextColor(),
+                Margin = new Thickness(8 * scale, 0, 0, 0)
+            };
+            Grid.SetColumn(brightnessText, 1);
+            itemPanel.Children.Add(brightnessText);
+
+            // Control Panel (Toggle + Delete Button) - Right aligned
+            var controlPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 4 * scale,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+
+            // Toggle switch
+            var toggleSwitch = new ToggleSwitch
+            {
+                IsOn = schedule.IsEnabled,
+                Margin = new Thickness(0, 0, 0, 0)
+            };
+            toggleSwitch.Toggled += (s, e) =>
+            {
+                ScheduleManager.Instance.ToggleSchedule(schedule);
+                RefreshScheduleList();
+            };
+            controlPanel.Children.Add(toggleSwitch);
+
+            // Delete button
+            var deleteButton = new Button
+            {
+                Content = "×",
+                Width = 24 * scale,
+                Height = 24 * scale,
+                FontSize = 12 * scale,
+                Padding = new Thickness(0),
+                CornerRadius = new CornerRadius(4 * scale),
+                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red),
+                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent)
+            };
+            deleteButton.Click += (s, e) => ScheduleManager.Instance.RemoveSchedule(schedule);
+            controlPanel.Children.Add(deleteButton);
+
+            // Add control panel to grid (span columns 2-3)
+            Grid.SetColumn(controlPanel, 2);
+            Grid.SetColumnSpan(controlPanel, 2);
+            itemPanel.Children.Add(controlPanel);
+
+            return itemPanel;
+        }
+
+        #endregion
+
+        #region Event Handlers
 
         private void SetupWindowProperties()
         {
@@ -278,15 +490,11 @@ namespace Auto_Screen_Brightness
                 var iconPath = "ms-appx:///Assets/Square44x44Logo.targetsize-24_altform-unplated.png";
                 this.SetWindowIcon(iconPath);
             }
-            catch
-            {
-                // Fallback if icon setting fails
-            }
+            catch { }
         }
 
         private void RegisterEventHandlers()
         {
-            // Handle window closing
             var hwnd = WindowNative.GetWindowHandle(this);
             var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
             AppWindow appWindow = AppWindow.GetFromWindowId(windowId);
@@ -319,6 +527,55 @@ namespace Auto_Screen_Brightness
             _startupToggle.IsOn = await StartupManager.IsEnabledAsync();
         }
 
+        private void RefreshCurrentBrightness()
+        {
+            var (success, value, message) = BrightnessManager.GetCurrentBrightness();
+            if (success)
+            {
+                _brightnessSlider.Value = value;
+                _currentBrightnessText.Text = $"Current: {value}%";
+            }
+        }
+
+        private async void BrightnessSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        {
+            var level = Convert.ToInt32(e.NewValue);
+            _currentBrightnessText.Text = $"Brightness: {level}%";
+            await Task.Run(() => BrightnessManager.SetBrightness(level, out var msg));
+        }
+
+        private void OverlaySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        {
+            var val = Convert.ToInt32(e.NewValue);
+            _currentOverlayBrightnessText.Text = $"Overlay: {val}%";
+
+            if (val >= 100)
+            {
+                OverlayManager.Stop();
+            }
+            else
+            {
+                if (!OverlayManager.IsRunning())
+                {
+                    OverlayManager.Start(val);
+                }
+                OverlayManager.UpdateOpacity(val);
+            }
+        }
+
+        private void AddButton_Click(object sender, RoutedEventArgs e)
+        {
+            var brightness = Convert.ToInt32(_brightnessSlider.Value);
+            var overlayBrightness = Convert.ToInt32(_overlaySlider.Value);
+
+            if (!ScheduleManager.Instance.CanAddSchedule(_selectedTime))
+            {
+                return;
+            }
+
+            ScheduleManager.Instance.AddScheduleWithOverlay(_selectedTime, brightness, overlayBrightness);
+        }
+
         private void OnScheduleTriggered(int brightness, int overlayBrightness)
         {
             Task.Run(() =>
@@ -342,141 +599,64 @@ namespace Auto_Screen_Brightness
             });
         }
 
-        private async void BrightnessSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        #endregion
+
+        #region Theme Management
+
+        private void RefreshTheme()
         {
-            var level = Convert.ToInt32(e.NewValue);
-            _currentBrightnessText.Text = $"Brightness: {level}%";
-
-            await Task.Run(() => BrightnessManager.SetBrightness(level, out var msg));
-
-        }
-
-        private void OverlaySlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-        {
-            var val = Convert.ToInt32(e.NewValue);
-            _currentOverlayBrightnessText.Text = $"Overlay: {val}%";
-
-            if (val >= 100)
+            if (Content is Grid mainGrid)
             {
-                OverlayManager.Stop();
+                mainGrid.Background = ThemeManager.GetBackgroundColor();
             }
-            else
+
+            // Update all text blocks and cards
+            if (Content is Grid grid && grid.Children.Count > 0 && grid.Children[0] is ScrollViewer scroll)
             {
-                if (!OverlayManager.IsRunning())
+                if (scroll.Content is StackPanel mainStack)
                 {
-                    OverlayManager.Start(val);
+                    foreach (var child in mainStack.Children)
+                    {
+                        UpdateElementTheme(child);
+                    }
                 }
-                OverlayManager.UpdateOpacity(val);
+            }
+
+            RefreshScheduleList();
+        }
+
+        private void UpdateElementTheme(UIElement element)
+        {
+            if (element is TextBlock textBlock)
+            {
+                textBlock.Foreground = ThemeManager.GetTextColor();
+            }
+            else if (element is StackPanel stackPanel)
+            {
+                stackPanel.Background = ThemeManager.GetCardBackground();
+                stackPanel.BorderBrush = ThemeManager.GetBorderBrush();
+
+                foreach (var child in stackPanel.Children)
+                {
+                    UpdateElementTheme(child);
+                }
+            }
+            else if (element is Grid grid)
+            {
+                // Only update Grid background if it already has one (skip Schedule Card which has no background)
+                if (grid.Background != null)
+                {
+                    grid.Background = ThemeManager.GetCardBackground();
+                    grid.BorderBrush = ThemeManager.GetBorderBrush();
+                }
+
+                foreach (var child in grid.Children)
+                {
+                    UpdateElementTheme(child);
+                }
             }
         }
 
-        private void RefreshCurrentBrightness()
-        {
-            var (success, value, message) = BrightnessManager.GetCurrentBrightness();
-            if (success)
-            {
-                _brightnessSlider.Value = value;
-                _currentBrightnessText.Text = $"Current: {value}%";
-            }
-        }
-
-        private void RefreshScheduleList()
-        {
-            _scheduleList.Children.Clear();
-
-            var sortedSchedules = ScheduleManager.Instance.Schedules.OrderBy(s => s.Time).ToList();
-
-            foreach (var schedule in sortedSchedules)
-            {
-                _scheduleList.Children.Add(CreateScheduleItemPanel(schedule));
-            }
-        }
-
-        private Grid CreateScheduleItemPanel(ScheduleEntry schedule)
-        {
-            var itemPanel = new Grid
-            {
-                Padding = new Thickness(12, 10, 12, 10),
-                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.LightGray) { Opacity = 0.3 },
-                Margin = new Thickness(0, 4, 0, 4),
-                BorderThickness = new Thickness(1),
-                BorderBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray)
-            };
-
-            itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(60) });
-            itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
-            itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            itemPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            // Time
-            var timeText = new TextBlock
-            {
-                Text = schedule.Time.ToString(@"hh\:mm"),
-                VerticalAlignment = VerticalAlignment.Center,
-                FontSize = 14,
-                FontWeight = Microsoft.UI.Text.FontWeights.Bold
-            };
-            Grid.SetColumn(timeText, 0);
-            itemPanel.Children.Add(timeText);
-
-            // Brightness
-            var brightnessText = new TextBlock
-            {
-                Text = $"{schedule.Brightness}%, {schedule.OverlayBrightness}%",
-                VerticalAlignment = VerticalAlignment.Center,
-                FontSize = 13
-            };
-            Grid.SetColumn(brightnessText, 1);
-            itemPanel.Children.Add(brightnessText);
-
-            // Toggle switch
-            var toggleSwitch = new ToggleSwitch
-            {
-                IsOn = schedule.IsEnabled,
-                Margin = new Thickness(0, 0, 8, 0)
-            };
-            toggleSwitch.Toggled += (s, e) =>
-            {
-                ScheduleManager.Instance.ToggleSchedule(schedule);
-                RefreshScheduleList();
-            };
-            Grid.SetColumn(toggleSwitch, 3);
-            itemPanel.Children.Add(toggleSwitch);
-
-            // Delete button
-            var deleteButton = new Button
-            {
-                Content = "✕",
-                Width = 32,
-                Height = 32,
-                FontSize = 14,
-                Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red),
-                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
-                BorderBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(16),
-                Padding = new Thickness(0)
-            };
-            deleteButton.Click += (s, e) => ScheduleManager.Instance.RemoveSchedule(schedule);
-            Grid.SetColumn(deleteButton, 4);
-            itemPanel.Children.Add(deleteButton);
-
-            return itemPanel;
-        }
-
-        private void AddButton_Click(object sender, RoutedEventArgs e)
-        {
-            var brightness = Convert.ToInt32(_brightnessSlider.Value);
-            var overlayBrightness = Convert.ToInt32(_overlaySlider.Value);
-
-            if (!ScheduleManager.Instance.CanAddSchedule(_selectedTime))
-            {
-                return;
-            }
-
-            ScheduleManager.Instance.AddScheduleWithOverlay(_selectedTime, brightness, overlayBrightness);
-        }
+        #endregion
     }
 }
