@@ -1,11 +1,12 @@
 # Auto Screen Brightness
 
+**Auto Screen Brightness** is a powerful Windows app designed to automatically adjust your screen and overlay brightness according to your daily schedule. Optimize your display for productivity, comfort, and energy efficiency with precise control.
+
+https://apps.microsoft.com/detail/9nkxgkmz5p85
 
 <img width="616" height="1133" alt="스크린샷 2026-01-14 205453" src="https://github.com/user-attachments/assets/7c982382-bef4-4c88-815f-6a0665b4f9cb" />
 
-**Auto Screen Brightness** is a powerful Windows app designed to automatically adjust your screen and overlay brightness according to your daily schedule. Optimize your display for productivity, comfort, and energy efficiency with precise control.
 
-## Download
 
 
 ## Key Features
