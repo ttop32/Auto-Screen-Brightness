@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Auto_Screen_Brightness
@@ -136,7 +137,7 @@ namespace Auto_Screen_Brightness
         private static readonly object _lock = new object();
         private static bool _isStarting = false;
 
-        public static void Start(int brightnessPercent)
+        public static void Start(int brightnessPercent, bool startInvisible = false)
         {
             lock (_lock)
             {
@@ -155,6 +156,7 @@ namespace Auto_Screen_Brightness
                 Stop();
 
                 double overlayOpacity = Math.Min(0.7, (100 - Math.Clamp(brightnessPercent, 0, 100)) / 100.0);
+                double initialOpacity = startInvisible ? 0.0 : overlayOpacity;
 
                 // Get all screens and create an overlay for each
                 var screens = Screen.AllScreens;
@@ -169,7 +171,7 @@ namespace Auto_Screen_Brightness
                             Application.EnableVisualStyles();
                             Application.SetCompatibleTextRenderingDefault(false);
 
-                            var form = new OverlayForm(overlayOpacity);
+                            var form = new OverlayForm(initialOpacity);
                             // Set the form bounds to the specific screen
                             form.Bounds = screen.Bounds;
                             
@@ -292,7 +294,133 @@ namespace Auto_Screen_Brightness
                 }
             }
         }
-        
+
+        public static async Task SmoothUpdateOpacityAsync(int brightnessPercent, TimeSpan duration)
+        {
+            List<OverlayForm> formsToUpdate;
+            lock (_lock)
+            {
+                formsToUpdate = new List<OverlayForm>(_forms);
+            }
+
+            if (formsToUpdate.Count == 0)
+            {
+                // If not running, start invisible then fade-in
+                Start(brightnessPercent, startInvisible: true);
+                // give the forms a moment to initialize
+                await Task.Delay(200);
+                lock (_lock)
+                {
+                    formsToUpdate = new List<OverlayForm>(_forms);
+                }
+            }
+
+            double targetOpacity = Math.Min(0.7, (100 - Math.Clamp(brightnessPercent, 0, 100)) / 100.0);
+
+            if (duration.TotalMilliseconds < 200)
+                duration = TimeSpan.FromMilliseconds(200);
+
+            int stepMs = 100;
+            int steps = Math.Max(1, (int)(duration.TotalMilliseconds / stepMs));
+            var delay = TimeSpan.FromMilliseconds(duration.TotalMilliseconds / steps);
+
+            // Capture start opacities per form
+            var starts = new Dictionary<OverlayForm, double>();
+            foreach (var form in formsToUpdate)
+            {
+                try
+                {
+                    starts[form] = Math.Clamp(form.Opacity, 0.0, 1.0);
+                }
+                catch
+                {
+                    starts[form] = 0.0;
+                }
+            }
+
+            for (int i = 1; i <= steps; i++)
+            {
+                double t = (double)i / steps;
+                foreach (var form in formsToUpdate)
+                {
+                    if (form == null) continue;
+                    try
+                    {
+                        double s = starts.ContainsKey(form) ? starts[form] : 0.0;
+                        double newOpacity = s + (targetOpacity - s) * t;
+                        form.SetOverlayOpacity(newOpacity);
+                    }
+                    catch
+                    {
+                        // swallow
+                    }
+                }
+
+                try { await Task.Delay(delay); } catch { break; }
+            }
+
+            // Ensure final state
+            foreach (var form in formsToUpdate)
+            {
+                try { form.SetOverlayOpacity(targetOpacity); } catch { }
+            }
+        }
+
+        public static async Task SmoothStopAsync(TimeSpan duration)
+        {
+            List<OverlayForm> formsToFade;
+            lock (_lock)
+            {
+                formsToFade = new List<OverlayForm>(_forms);
+            }
+
+            if (formsToFade.Count == 0)
+                return;
+
+            if (duration.TotalMilliseconds < 200)
+                duration = TimeSpan.FromMilliseconds(200);
+
+            int stepMs = 100;
+            int steps = Math.Max(1, (int)(duration.TotalMilliseconds / stepMs));
+            var delay = TimeSpan.FromMilliseconds(duration.TotalMilliseconds / steps);
+
+            // Capture start opacities
+            var starts = new Dictionary<OverlayForm, double>();
+            foreach (var form in formsToFade)
+            {
+                try { starts[form] = Math.Clamp(form.Opacity, 0.0, 1.0); } catch { starts[form] = 0.0; }
+            }
+
+            for (int i = 1; i <= steps; i++)
+            {
+                double t = (double)i / steps;
+                foreach (var form in formsToFade)
+                {
+                    if (form == null) continue;
+                    try
+                    {
+                        double s = starts.ContainsKey(form) ? starts[form] : 0.0;
+                        double newOpacity = s + (0.0 - s) * t;
+                        form.SetOverlayOpacity(newOpacity);
+                    }
+                    catch
+                    {
+                        // swallow
+                    }
+                }
+
+                try { await Task.Delay(delay); } catch { break; }
+            }
+
+            // Ensure fully transparent then stop
+            foreach (var form in formsToFade)
+            {
+                try { form.SetOverlayOpacity(0.0); } catch { }
+            }
+
+            Stop();
+        }
+
         public static bool IsRunning()
         {
             lock (_lock)

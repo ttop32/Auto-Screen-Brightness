@@ -5,7 +5,6 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Windows.UI.ViewManagement;
 using WinRT.Interop;
 using Microsoft.UI.Windowing;
 
@@ -30,14 +29,7 @@ namespace Auto_Screen_Brightness
             SetupWindowProperties();
             RegisterEventHandlers();
             RefreshCurrentBrightness();
-
-            this.Activated += (s, e) =>
-            {
-                if (ScheduleManager.Instance != null && !ScheduleManager.Instance.IsInitialized)
-                {
-                    ScheduleManager.Instance.Initialize(OnScheduleTriggered);
-                }
-            };
+            ScheduleManager.Instance.Initialize(OnScheduleTriggered);
         }
 
         private void InitializeComponent()
@@ -578,17 +570,33 @@ namespace Auto_Screen_Brightness
 
         private void OnScheduleTriggered(int brightness, int overlayBrightness)
         {
-            Task.Run(() =>
+            Task.Run(async () =>
             {
-                BrightnessManager.SetBrightness(brightness, out _);
-
-                if (overlayBrightness >= 100)
+                // Smoothly transition brightness over 2 seconds
+                try
                 {
-                    OverlayManager.Stop();
+                    await BrightnessManager.SmoothSetBrightnessAsync(brightness, TimeSpan.FromSeconds(2));
                 }
-                else
+                catch
                 {
-                    OverlayManager.Start(overlayBrightness);
+                    // swallow
+                }
+
+                // Smoothly transition overlay opacity
+                try
+                {
+                    if (overlayBrightness >= 100)
+                    {
+                        await OverlayManager.SmoothStopAsync(TimeSpan.FromSeconds(1));
+                    }
+                    else
+                    {
+                        await OverlayManager.SmoothUpdateOpacityAsync(overlayBrightness, TimeSpan.FromSeconds(1.5));
+                    }
+                }
+                catch
+                {
+                    // swallow
                 }
 
                 this.DispatcherQueue?.TryEnqueue(() =>
