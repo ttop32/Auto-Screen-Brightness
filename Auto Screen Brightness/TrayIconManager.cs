@@ -10,6 +10,8 @@ namespace Auto_Screen_Brightness {
         private static NotifyIconWrapper? _icon;
         private static bool _initialized;
 
+        public static bool ExitRequested { get; set; } = false;
+
         [DllImport("user32.dll")]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
 
@@ -52,6 +54,8 @@ namespace Auto_Screen_Brightness {
 
             _icon.OnExit += () => {
                 _window?.DispatcherQueue?.TryEnqueue(() => {
+                    // Mark that an explicit exit was requested so the window-closing handler won't minimize to tray
+                    ExitRequested = true;
                     _window?.Close();
                 });
             };
@@ -76,6 +80,7 @@ namespace Auto_Screen_Brightness {
         }
 
         public static void Cleanup() {
+            ExitRequested = false;
             _icon?.Dispose();
             _icon = null;
             _initialized = false;
