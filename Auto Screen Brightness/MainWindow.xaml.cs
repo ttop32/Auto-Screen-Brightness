@@ -495,7 +495,15 @@ namespace Auto_Screen_Brightness
 
         private void HandleWindowClosing(AppWindowClosingEventArgs e)
         {
-            if (SettingsManager.Settings.MinimizeToTrayOnClose)
+            // Allow close if user explicitly requested exit via tray icon
+            if (TrayIconManager.ExitRequested)
+            {
+                CleanupAndExit();
+                return;
+            }
+
+            // If system shutdown is in progress, allow the app to close regardless of the minimize-to-tray setting
+            if (SettingsManager.Settings.MinimizeToTrayOnClose && !Environment.HasShutdownStarted)
             {
                 e.Cancel = true;
                 TrayIconManager.HideWindow();
