@@ -15,6 +15,8 @@ namespace Auto_Screen_Brightness {
 
             TrayIconManager.Initialize(_window);
 
+
+
             AppInstance.GetCurrent().Activated += (_, __) => {
                 _window.DispatcherQueue.TryEnqueue(() => {
                     TrayIconManager.ShowWindow();
@@ -25,7 +27,8 @@ namespace Auto_Screen_Brightness {
                 .GetCurrent()
                 .GetActivatedEventArgs();
 
-            if (activatedArgs.Kind != ExtendedActivationKind.StartupTask) {
+            if (activatedArgs.Kind != ExtendedActivationKind.StartupTask)
+            {
                 _window.Activate();
             }
         }
